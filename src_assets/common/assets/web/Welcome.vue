@@ -1,47 +1,42 @@
 <template>
   <Navbar-Simple></Navbar-Simple>
   <Notification></Notification>
-  <main id="content" class="container" role="main">
-    <h1 class="my-4">{{ $t('welcome.greeting') }}</h1>
-    <p>{{ $t('welcome.create_creds') }}</p>
-    <div class="d-flex gap-4 align-items-start">
-      <div class="card">
-        <div class="card-body">
-          <div class="alert alert-warning">
-            {{ $t('welcome.create_creds_alert') }}
-          </div>
-          <form @submit.prevent="save">
-            <div class="mb-3">
-              <label for="usernameInput" class="form-label">{{ $t('_common.username') }}</label>
-              <input type="text" class="form-control" id="usernameInput" autocomplete="username"
-                v-model="passwordData.newUsername" />
-            </div>
-            <div class="mb-3">
-              <label for="passwordInput" class="form-label">{{ $t('_common.password') }}</label>
-              <input type="password" class="form-control" id="passwordInput" autocomplete="new-password"
-                v-model="passwordData.newPassword" required />
-            </div>
-            <div class="mb-3">
-              <label for="confirmPasswordInput" class="form-label">{{ $t('welcome.confirm_password') }}</label>
-              <input type="password" class="form-control" id="confirmPasswordInput" autocomplete="new-password"
-                v-model="passwordData.confirmNewPassword" required />
-            </div>
-            <button type="submit" class="btn btn-primary" v-bind:disabled="loading">
-              <log-in :size="18" class="icon"></log-in>
-              {{ $t('welcome.login') }}
-            </button>
-            <div class="alert alert-danger mt-3 mb-0" v-if="error"><b>{{ $t('_common.error') }}</b> {{error}}</div>
-            <div class="alert alert-success mt-3 mb-0" v-if="success">
-              <b>{{ $t('_common.success') }}</b> {{ $t('welcome.welcome_success') }}
-            </div>
-          </form>
-        </div>
-      </div>
+  <div class="sx-center">
+    <main id="content">
       <div>
-        <Resource-Card></Resource-Card>
+        <h1>{{ $t('welcome.greeting') }}</h1>
+        <p class="sx-hint mt-2">{{ $t('welcome.create_creds') }}</p>
       </div>
-    </div>
-  </main>
+      <div class="sx-callout">{{ $t('welcome.create_creds_alert') }}</div>
+      <form @submit.prevent="save" class="sx-panel">
+        <div class="sx-panel-body">
+          <div class="mb-3">
+            <label for="usernameInput" class="form-label">{{ $t('_common.username') }}</label>
+            <input type="text" class="form-control" id="usernameInput" autocomplete="username"
+              v-model="passwordData.newUsername" />
+          </div>
+          <div class="mb-3">
+            <label for="passwordInput" class="form-label">{{ $t('_common.password') }}</label>
+            <input type="password" class="form-control" id="passwordInput" autocomplete="new-password"
+              v-model="passwordData.newPassword" required />
+          </div>
+          <div class="mb-3">
+            <label for="confirmPasswordInput" class="form-label">{{ $t('welcome.confirm_password') }}</label>
+            <input type="password" class="form-control" id="confirmPasswordInput" autocomplete="new-password"
+              v-model="passwordData.confirmNewPassword" required />
+          </div>
+          <button type="submit" class="btn btn-primary w-100" v-bind:disabled="loading">
+            {{ $t('welcome.login') }}
+          </button>
+          <div class="alert alert-danger mt-3 mb-0" v-if="error"><b>{{ $t('_common.error') }}</b> {{error}}</div>
+          <div class="alert alert-success mt-3 mb-0" v-if="success">
+            <b>{{ $t('_common.success') }}</b> {{ $t('welcome.welcome_success') }}
+          </div>
+        </div>
+      </form>
+      <Resource-Card></Resource-Card>
+    </main>
+  </div>
 </template>
 
 <script>
@@ -49,14 +44,12 @@
   import { apiFetch } from './fetch_utils'
   import Notification from './Notification.vue'
   import NavbarSimple from './NavbarSimple.vue'
-  import { LogIn } from '@lucide/vue'
 
   export default {
     components: {
       ResourceCard,
       Notification,
       NavbarSimple,
-      LogIn,
     },
     data() {
       return {

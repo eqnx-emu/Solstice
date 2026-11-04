@@ -1,131 +1,148 @@
 <template>
   <Navbar></Navbar>
-  <div id="content" class="container">
-    <h1 class="my-4">{{ $t('index.welcome') }}</h1>
-    <p>{{ $t('index.description') }}</p>
+  <main id="content" class="container sx-page">
+    <header class="sx-page-header">
+      <div>
+        <h1>{{ $t(needsAttention ? 'index.status_attention' : 'index.status_ready') }}</h1>
+        <p class="sx-hint">{{ $t(needsAttention ? 'index.status_attention_desc' : 'index.status_ready_desc') }}</p>
+      </div>
+      <div class="sx-page-actions">
+        <RouterLink class="btn btn-sx" to="/troubleshooting#logs">{{ $t('index.view_logs') }}</RouterLink>
+      </div>
+    </header>
 
     <!-- Fatal Errors Alert -->
-    <div class="alert alert-danger my-4" v-if="fancyLogs.some(x => x.level === 'Fatal')">
-      <div>
-        <div class="d-flex align-items-center mb-3">
-          <alert-circle :size="32" class="icon-lg me-3"></alert-circle>
-          <div v-html="$t('index.startup_errors')"></div>
-        </div>
-        <ul class="mb-3">
-          <li v-for="v in fancyLogs.filter(x => x.level === 'Fatal')" :key="`${v.timestamp}-${v.value}`">{{v.value}}</li>
-        </ul>
-        <RouterLink class="btn btn-danger" to="/troubleshooting#logs">
-          <file-text :size="18" class="icon"></file-text>
-          View Logs
-        </RouterLink>
+    <div class="alert alert-danger my-4" v-if="fatalLogs.length">
+      <div class="d-flex align-items-center mb-3">
+        <alert-circle :size="24" class="icon me-3"></alert-circle>
+        <div v-html="$t('index.startup_errors')"></div>
       </div>
+      <ul class="mb-3">
+        <li v-for="v in fatalLogs" :key="`${v.timestamp}-${v.value}`">{{v.value}}</li>
+      </ul>
+      <RouterLink class="btn btn-danger" to="/troubleshooting#logs">{{ $t('index.view_logs') }}</RouterLink>
     </div>
 
-    <div class="alert alert-warning my-4" v-if="missingPermissions.length">
+    <div class="alert alert-warning" v-if="missingPermissions.length">
       <div class="d-flex align-items-center gap-3 mb-2">
-        <alert-triangle :size="24" class="icon"></alert-triangle>
+        <alert-triangle :size="20" class="icon"></alert-triangle>
         <strong>{{ $t('index.permissions_missing_title') }}</strong>
       </div>
       <p>{{ $t('index.permissions_missing_desc') }}</p>
-      <RouterLink class="btn btn-warning" to="/troubleshooting#permissions">
+      <RouterLink class="btn btn-sx" to="/troubleshooting#permissions">
         {{ $t('index.permissions_review') }}
       </RouterLink>
     </div>
 
     <!-- Virtual gamepad broker status -->
     <div class="alert my-4" :class="virtualInputNotice.alertClass" v-if="virtualInputNotice">
-      <div>
-        <div class="d-flex align-items-center mb-3">
-          <alert-triangle v-if="virtualInputNotice.warning" :size="32" class="icon-lg me-3"></alert-triangle>
-          <info v-else :size="32" class="icon-lg me-3"></info>
-          <div>
-            <p class="mb-1"><strong>{{ $t(virtualInputNotice.title) }}</strong></p>
-            <p v-for="message in virtualInputNotice.messages" :key="message.key" class="mb-1">
-              {{ $t(message.key, message.params || {}) }}
-            </p>
-          </div>
+      <div class="d-flex align-items-start gap-3 mb-3">
+        <alert-triangle v-if="virtualInputNotice.warning" :size="20" class="icon flex-shrink-0"></alert-triangle>
+        <info v-else :size="20" class="icon flex-shrink-0"></info>
+        <div>
+          <p class="mb-1"><strong>{{ $t(virtualInputNotice.title) }}</strong></p>
+          <p v-for="message in virtualInputNotice.messages" :key="message.key" class="mb-1">
+            {{ $t(message.key, message.params || {}) }}
+          </p>
         </div>
-        <RouterLink class="btn" :class="virtualInputNotice.buttonClass" :to="virtualInputNotice.to">
-          <gamepad-2 v-if="virtualInputNotice.chooseDriver" :size="18" class="icon"></gamepad-2>
-          <wrench v-else :size="18" class="icon"></wrench>
-          {{ $t(virtualInputNotice.action) }}
-        </RouterLink>
       </div>
+      <RouterLink class="btn btn-sx" :to="virtualInputNotice.to">
+        {{ $t(virtualInputNotice.action) }}
+      </RouterLink>
+    </div>
+
+    <!-- Pending pairing request: the one action that cannot wait -->
+    <section class="sx-panel sx-panel-highlight home-pairing" v-if="pendingPairings.length">
+      <div class="sx-panel-head">
+        <div>
+          <h2>{{ $t('index.pairing_request_title', { name: primaryPairing.name || $t('pin.unknown_device') }) }}</h2>
+          <p class="sx-hint">{{ $t('index.pairing_request_desc') }}</p>
+        </div>
+      </div>
+      <form class="sx-panel-body d-flex flex-wrap align-items-end gap-3" @submit.prevent="pairPrimary">
+        <div class="d-flex flex-column gap-1">
+          <label for="home-pin" class="form-label mb-0">{{ $t('navbar.pin') }}</label>
+          <input id="home-pin" v-model="pin" class="form-control sx-pin-input sx-pin-inline" type="text"
+                 inputmode="numeric" pattern="\d{4}" maxlength="4" placeholder="0000" required>
+        </div>
+        <button class="btn btn-accent" type="submit">{{ $t('index.pair') }}</button>
+        <RouterLink class="btn btn-link" to="/pin" v-if="pendingPairings.length > 1">
+          {{ $t('index.other_requests', { count: pendingPairings.length - 1 }) }}
+        </RouterLink>
+        <p v-if="pairStatus" class="w-100 mb-0" :class="pairStatus.ok ? 'sx-ok' : 'sx-bad'" role="status">
+          {{ $t(pairStatus.key) }}
+        </p>
+      </form>
+    </section>
+
+    <div class="sx-split">
+      <section class="sx-panel sx-wide">
+        <div class="sx-panel-head">
+          <h2>{{ $t('index.paired_devices') }}</h2>
+          <RouterLink to="/pin">{{ $t('index.manage') }}</RouterLink>
+        </div>
+        <ul class="sx-rows" v-if="clients.length">
+          <li class="sx-row" v-for="client in clients" :key="client.uuid">
+            <span class="sx-row-main"><span class="fw-medium">{{ client.name || $t('troubleshooting.unpair_single_unknown') }}</span></span>
+            <span class="sx-tag" v-if="client.enabled === false">{{ $t('index.client_disabled') }}</span>
+          </li>
+        </ul>
+        <p class="sx-panel-body sx-hint" v-else>{{ $t('index.no_paired_devices') }}</p>
+      </section>
+
+      <section class="sx-panel sx-narrow">
+        <div class="sx-panel-head"><h2>{{ $t('index.host') }}</h2></div>
+        <ul class="sx-rows">
+          <li class="sx-row" v-if="platform">
+            <span class="sx-row-main">{{ $t('index.platform') }}</span>
+            <span class="sx-mono">{{ platform }}</span>
+          </li>
+          <li class="sx-row">
+            <span class="sx-row-main">{{ $t('index.gamepad') }}</span>
+            <span :class="virtualInputNotice && virtualInputNotice.warning ? 'sx-warn' : 'sx-ok'">
+              {{ !controllerEnabled || gamepadDriver === 'none' ? $t('index.gamepad_disabled') : (virtualInputNotice && virtualInputNotice.warning ? $t('index.needs_attention') : $t('index.ok')) }}
+            </span>
+          </li>
+          <li class="sx-row">
+            <span class="sx-row-main">{{ $t('index.permissions') }}</span>
+            <span :class="missingPermissions.length ? 'sx-warn' : 'sx-ok'">
+              {{ missingPermissions.length ? $t('index.needs_attention') : $t('index.ok') }}
+            </span>
+          </li>
+          <li class="sx-row">
+            <span class="sx-row-main">{{ $t('index.startup') }}</span>
+            <span :class="fatalLogs.length ? 'sx-bad' : 'sx-ok'">
+              {{ fatalLogs.length ? $t('index.startup_failed') : $t('index.ok') }}
+            </span>
+          </li>
+        </ul>
+      </section>
     </div>
 
     <!-- Version -->
-    <div class="card my-4">
-      <div class="card-body" v-if="version">
-        <h2>Version {{version.version}}</h2>
-
-        <div v-if="loading" class="my-3">
-          {{ $t('index.loading_latest') }}
-        </div>
-
-        <div class="alert alert-success my-3" v-if="buildVersionIsDirty">
-          <package :size="18" class="icon"></package>
-          {{ $t('index.version_dirty') }} 🌇
-        </div>
-
-        <div class="alert alert-info my-3" v-if="installedVersionNotStable">
-          <info :size="18" class="icon"></info>
-          {{ $t('index.installed_version_not_stable') }}
-        </div>
-
-        <div v-else-if="(!preReleaseBuildAvailable || !notifyPreReleases) && !stableBuildAvailable && !buildVersionIsDirty">
-          <div class="alert alert-success my-3">
-            <check-circle :size="18" class="icon"></check-circle>
-            {{ $t('index.version_latest') }}
-          </div>
-        </div>
-
-        <div v-if="notifyPreReleases && preReleaseBuildAvailable">
-          <div class="alert alert-warning my-3">
-            <!-- header row -->
-            <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
-              <div class="d-flex align-items-center gap-3 flex-wrap">
-                <alert-circle :size="18" class="icon"></alert-circle>
-                <span>{{ $t('index.new_pre_release') }}</span>
-                <h5 class="mb-0">{{ preReleaseVersion.release.name }}</h5>
-              </div>
-              <a class="btn btn-success flex-shrink-0" :href="preReleaseVersion.release.html_url" target="_blank">
-                <download :size="18" class="icon"></download>
-                {{ $t('index.download') }}
-              </a>
-            </div>
-
-            <!-- body row (full width) -->
-            <div class="markdown-body release-notes" v-html="convertMarkdownToHtml(preReleaseVersion.release.body)"></div>
-          </div>
-        </div>
-
-        <div v-if="stableBuildAvailable">
-          <div class="alert alert-warning my-3">
-            <!-- header row -->
-            <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
-              <div class="d-flex align-items-center gap-3 flex-wrap">
-                <alert-circle :size="18" class="icon"></alert-circle>
-                <span>{{ $t('index.new_stable') }}</span>
-                <h5 class="mb-0">{{ githubVersion.release.name }}</h5>
-              </div>
-              <a class="btn btn-success flex-shrink-0" :href="githubVersion.release.html_url" target="_blank">
-                <download :size="18" class="icon"></download>
-                {{ $t('index.download') }}
-              </a>
-            </div>
-
-            <!-- body row (full width) -->
-            <div class="markdown-body release-notes" v-html="convertMarkdownToHtml(githubVersion.release.body)"></div>
-          </div>
-        </div>
+    <section class="sx-dashed home-version" v-if="version">
+      <div class="d-flex flex-wrap align-items-center gap-3 p-3">
+        <p class="mb-0 flex-grow-1">
+          <strong>{{ $t('index.version', { version: version.version }) }}</strong>
+          <span class="sx-hint ms-2" v-if="loading">{{ $t('index.loading_latest') }}</span>
+          <span class="sx-hint ms-2" v-else-if="buildVersionIsDirty">{{ $t('index.version_dirty') }}</span>
+          <span class="sx-hint ms-2" v-else-if="installedVersionNotStable">{{ $t('index.installed_version_not_stable') }}</span>
+          <span class="sx-hint ms-2" v-else-if="availableRelease">{{ $t(availableRelease.labelKey) }} <strong>{{ availableRelease.release.name }}</strong></span>
+          <span class="sx-hint ms-2" v-else>{{ $t('index.version_latest') }}</span>
+        </p>
+        <a v-if="availableRelease" class="btn btn-primary" :href="availableRelease.release.html_url" target="_blank" rel="noopener">
+          <download :size="18" class="icon"></download>
+          {{ $t('index.download') }}
+        </a>
       </div>
-    </div>
+      <details v-if="availableRelease && availableRelease.release.body" class="px-3 pb-3">
+        <summary>{{ $t('index.release_notes') }}</summary>
+        <div class="markdown-body release-notes mt-2" v-html="convertMarkdownToHtml(availableRelease.release.body)"></div>
+      </details>
+    </section>
 
-    <!-- Resources -->
-    <div class="my-4">
-      <Resource-Card :installed-version-not-stable="installedVersionNotStable"></Resource-Card>
-    </div>
-  </div>
+    <Resource-Card :installed-version-not-stable="installedVersionNotStable"></Resource-Card>
+  </main>
 </template>
 
 <script>
@@ -133,16 +150,12 @@
   import Navbar from './Navbar.vue'
   import ResourceCard from './ResourceCard.vue'
   import SunshineVersion from './sunshine_version'
+  import { apiFetch } from './fetch_utils'
   import {
     AlertCircle,
     AlertTriangle,
-    FileText,
-    Wrench,
-    Package,
     Info,
-    CheckCircle,
     Download,
-    Gamepad2
   } from '@lucide/vue'
 
   // Configure marked to allow HTML
@@ -161,13 +174,8 @@
       ResourceCard,
       AlertCircle,
       AlertTriangle,
-      FileText,
-      Wrench,
-      Package,
       Info,
-      CheckCircle,
       Download,
-      Gamepad2
     },
     data() {
       return {
@@ -184,7 +192,20 @@
         virtualhidLicense: null,
         vigembus: null,
         permissions: [],
+        pendingPairings: [],
+        clients: [],
+        pin: '',
+        pairStatus: null,
+        pairingTimer: null,
       }
+    },
+    mounted() {
+      this.loadClients();
+      this.loadPendingPairings();
+      this.pairingTimer = globalThis.setInterval(() => this.loadPendingPairings(), 3000);
+    },
+    beforeUnmount() {
+      globalThis.clearInterval(this.pairingTimer);
     },
     async created() {
       try {
@@ -236,6 +257,28 @@
       this.loading = false;
     },
     computed: {
+      /** Return the oldest pending pairing request, which the home page answers inline. */
+      primaryPairing() {
+        return this.pendingPairings[0] || {};
+      },
+      /** Return fatal startup log entries. */
+      fatalLogs() {
+        return this.fancyLogs.filter(x => x.level === 'Fatal');
+      },
+      /** Whether something on the host blocks or degrades streaming. */
+      needsAttention() {
+        return this.fatalLogs.length > 0 || this.missingPermissions.length > 0 || !!this.virtualInputNotice?.warning;
+      },
+      /** Return the newer release to offer, preferring a pre-release only when the user opted in. */
+      availableRelease() {
+        if (this.notifyPreReleases && this.preReleaseBuildAvailable) {
+          return { release: this.preReleaseVersion.release, labelKey: 'index.new_pre_release' };
+        }
+        if (this.stableBuildAvailable) {
+          return { release: this.githubVersion.release, labelKey: 'index.new_stable' };
+        }
+        return null;
+      },
       /** Return required permissions that the current platform can check and has not granted. */
       missingPermissions() {
         return this.permissions.filter(permission => permission.required && permission.verifiable && permission.status !== 'granted');
@@ -404,6 +447,48 @@
           return this.buildVirtualInputNotice(false, 'index.virtualhid_development_title', [{ key: 'index.virtualhid_development_desc' }]);
         }
         return null;
+      },
+      /** Load paired clients for the summary list. */
+      async loadClients() {
+        try {
+          const body = await fetch('./api/clients/list').then(r => r.json());
+          this.clients = body.named_certs || [];
+        } catch (e) {
+          console.error('Failed to load paired clients:', e);
+        }
+      },
+      /** Refresh pairing requests waiting for a PIN. */
+      async loadPendingPairings() {
+        try {
+          const response = await apiFetch('./api/pin', { method: 'GET' });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          this.pendingPairings = (await response.json()).pairings || [];
+        } catch (e) {
+          console.error('Failed to load pending pairing requests:', e);
+        }
+      },
+      /** Send the typed PIN for the oldest pending request. */
+      async pairPrimary() {
+        const pairing = this.primaryPairing;
+        if (!pairing.id) {
+          return;
+        }
+        const response = await apiFetch('./api/pin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pairing_id: pairing.id, pin: this.pin, name: pairing.name || '' }),
+        });
+        const result = await response.json();
+        this.pairStatus = result.status === true
+          ? { ok: true, key: 'pin.pair_success' }
+          : { ok: false, key: 'pin.pair_failure' };
+        if (result.status === true) {
+          this.pin = '';
+          await this.loadClients();
+        }
+        await this.loadPendingPairings();
       },
       convertMarkdownToHtml(markdown) {
         if (!markdown) return '';

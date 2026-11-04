@@ -1,73 +1,42 @@
 <template>
   <div>
-    <nav class="navbar navbar-expand-lg navbar-sunshine">
-      <div class="container-fluid">
-        <RouterLink class="navbar-brand" to="/" title="Sunshine">
-          <img src="/images/logo-sunshine-45.png" height="45" alt="Sunshine">
+    <nav class="navbar navbar-expand-lg navbar-sunshine" :aria-label="$t('navbar.main_navigation')">
+      <div class="container-fluid px-lg-4">
+        <RouterLink class="navbar-brand" to="/">
+          <img src="/images/logo-sunshine-45.png" height="28" width="28" alt="">
+          Sunshine
         </RouterLink>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
-                aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                aria-controls="navbarSupportedContent" aria-expanded="false" :aria-label="$t('navbar.toggle_navigation')">
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarSupportedContent">
-          <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-            <li class="nav-item">
-              <RouterLink class="nav-link" to="/">
-                <Home :size="18" class="icon"></Home>
-                {{ $t('navbar.home') }}
-              </RouterLink>
-            </li>
-            <li class="nav-item">
-              <RouterLink class="nav-link" to="/pin">
-                <Lock :size="18" class="icon"></Lock>
-                {{ $t('navbar.pin') }}
-              </RouterLink>
-            </li>
-            <li class="nav-item">
-              <RouterLink class="nav-link" to="/apps">
-                <Layers :size="18" class="icon"></Layers>
-                {{ $t('navbar.applications') }}
-              </RouterLink>
-            </li>
-            <li class="nav-item">
-              <RouterLink class="nav-link" to="/featured">
-                <Star :size="18" class="icon"></Star>
-                {{ $t('navbar.featured') }}
-              </RouterLink>
-            </li>
-            <li class="nav-item">
-              <RouterLink class="nav-link" to="/config">
-                <Settings :size="18" class="icon"></Settings>
-                {{ $t('navbar.configuration') }}
-              </RouterLink>
-            </li>
-            <li class="nav-item">
-              <RouterLink class="nav-link" to="/troubleshooting">
-                <Info :size="18" class="icon"></Info>
-                {{ $t('navbar.troubleshoot') }}
+          <ul class="navbar-nav me-auto mb-2 mb-lg-0 gap-lg-1">
+            <li class="nav-item" v-for="item in items" :key="item.to">
+              <RouterLink class="nav-link" :to="item.to" :class="{ active: isActive(item) }"
+                          :aria-current="isActive(item) ? 'page' : null">
+                {{ $t(item.label) }}
               </RouterLink>
             </li>
           </ul>
-          <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+          <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
             <li class="nav-item">
               <ThemeToggle/>
             </li>
             <li class="nav-item dropdown">
               <button class="nav-link dropdown-toggle" type="button" id="navbarUserMenu"
-                      data-bs-toggle="dropdown" aria-expanded="false" aria-label="User menu" title="User menu">
-                <CircleUserRound :size="18" class="icon"></CircleUserRound>
+                      data-bs-toggle="dropdown" aria-expanded="false">
+                {{ $t('navbar.account') }}
               </button>
               <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarUserMenu">
                 <li>
                   <RouterLink class="dropdown-item d-flex align-items-center" to="/password">
-                    <Shield :size="18" class="icon"></Shield>
                     {{ $t('navbar.password') }}
                   </RouterLink>
                 </li>
                 <li><hr class="dropdown-divider"></li>
                 <li>
                   <button type="button" class="dropdown-item d-flex align-items-center" @click="logout">
-                    <LogOut :size="18" class="icon"></LogOut>
                     {{ $t('navbar.logout') }}
                   </button>
                 </li>
@@ -82,7 +51,6 @@
 </template>
 
 <script>
-import { CircleUserRound, Home, Info, Layers, Lock, LogOut, Settings, Shield, Star } from '@lucide/vue'
 import ThemeToggle from './ThemeToggle.vue'
 import Notification from './Notification.vue'
 
@@ -90,17 +58,27 @@ export default {
   components: {
     ThemeToggle,
     Notification,
-    Home,
-    Lock,
-    Layers,
-    Star,
-    Settings,
-    Shield,
-    Info,
-    CircleUserRound,
-    LogOut
+  },
+  data() {
+    return {
+      // Featured apps live under Applications, so that item stays active there too.
+      items: [
+        { to: '/', label: 'navbar.home', exact: true },
+        { to: '/apps', label: 'navbar.applications', also: ['/featured'] },
+        { to: '/pin', label: 'navbar.pairing' },
+        { to: '/config', label: 'navbar.configuration' },
+        { to: '/troubleshooting', label: 'navbar.troubleshoot' },
+      ],
+    }
   },
   methods: {
+    isActive(item) {
+      const path = this.$route?.path || ''
+      if (item.exact) {
+        return path === item.to
+      }
+      return path.startsWith(item.to) || (item.also || []).some(p => path.startsWith(p))
+    },
     logout() {
       const cacheBuster = Date.now().toString()
       const logoutPageUrl = new URL('/logout', globalThis.location.href)

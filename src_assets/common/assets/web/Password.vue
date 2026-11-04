@@ -1,16 +1,18 @@
 <template>
   <Navbar></Navbar>
-  <div id="content" class="container">
-    <div class="my-4">
-      <h1>{{ $t('password.password_change') }}</h1>
-      <p>{{ $t('password.password_change_desc') }}</p>
+  <main id="content" class="container sx-page sx-page-narrow">
+    <div class="sx-page-header">
+      <div>
+        <h1>{{ $t('password.password_change') }}</h1>
+        <p class="sx-hint">{{ $t('password.password_change_desc') }}</p>
+      </div>
     </div>
     <form @submit.prevent="save">
-      <div class="card">
-        <div class="card-body">
+      <div class="sx-panel">
+        <div class="sx-panel-body">
           <div class="row">
             <div class="col-md-6">
-              <h4>{{ $t('password.current_creds') }}</h4>
+              <h2 class="h5 mb-3">{{ $t('password.current_creds') }}</h2>
               <div class="mb-3">
                 <label for="currentUsername" class="form-label">{{ $t('_common.username') }}</label>
                 <input required type="text" class="form-control" id="currentUsername"
@@ -23,7 +25,7 @@
               </div>
             </div>
             <div class="col-md-6">
-              <h4>{{ $t('password.new_creds') }}</h4>
+              <h2 class="h5 mb-3">{{ $t('password.new_creds') }}</h2>
               <div class="mb-3">
                 <label for="newUsername" class="form-label">{{ $t('_common.username') }}</label>
                 <input type="text" class="form-control" id="newUsername" v-model="passwordData.newUsername" />
@@ -43,29 +45,24 @@
           </div>
         </div>
       </div>
-      <div class="alert alert-danger my-3" v-if="error"><b>Error: </b>{{error}}</div>
+      <div class="alert alert-danger my-3" v-if="error"><b>{{ $t('_common.error') }}</b> {{error}}</div>
       <div class="alert alert-success my-3" v-if="success">
         <b>{{ $t('_common.success') }}</b> {{ $t('password.success_msg') }}
       </div>
-      <div class="mb-3 mt-4">
-        <button type="submit" class="btn btn-primary">
-          <save :size="18" class="icon"></save>
-          {{ $t('_common.save') }}
-        </button>
+      <div class="d-flex align-items-center gap-3 mt-4">
+        <button type="submit" class="btn btn-primary">{{ $t('_common.save') }}</button>
       </div>
     </form>
-  </div>
+  </main>
 </template>
 
 <script>
   import Navbar from './Navbar.vue'
   import { apiFetch } from './fetch_utils'
-  import { Save } from '@lucide/vue'
 
   export default {
     components: {
       Navbar,
-      Save,
     },
     data() {
       return {

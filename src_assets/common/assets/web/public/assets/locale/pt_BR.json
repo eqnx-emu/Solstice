@@ -105,7 +105,10 @@
     "wait_all": "Continuar a transmissão até que todos os processos do aplicativo sejam encerrados",
     "wait_all_desc": "Isso continuará a transmissão até que todos os processos iniciados pelo aplicativo tenham sido encerrados. Quando desmarcada, a transmissão será interrompida quando o processo inicial do aplicativo for encerrado, mesmo que outros processos do aplicativo ainda estejam em execução.",
     "working_dir": "Diretório de trabalho",
-    "working_dir_desc": "O diretório de trabalho que deve ser passado para o processo. Por exemplo, alguns aplicativos usam o diretório de trabalho para procurar arquivos de configuração. Se não for definido, o padrão do Sunshine será o diretório pai do comando"
+    "working_dir_desc": "O diretório de trabalho que deve ser passado para o processo. Por exemplo, alguns aplicativos usam o diretório de trabalho para procurar arquivos de configuração. Se não for definido, o padrão do Sunshine será o diretório pai do comando",
+    "clear_search": "Limpar busca",
+    "section_basic": "Básico",
+    "section_execution": "Execução"
   },
   "config": {
     "adapter_name": "Nome do adaptador",
@@ -482,7 +485,12 @@
     "wan_encryption_mode": "Modo de criptografia WAN",
     "wan_encryption_mode_1": "Ativado para clientes compatíveis (padrão)",
     "wan_encryption_mode_2": "Necessário para todos os clientes",
-    "wan_encryption_mode_desc": "Isso determina quando a criptografia será usada durante a transmissão pela Internet. A criptografia pode reduzir o desempenho da transmissão, principalmente em hosts e clientes menos potentes."
+    "wan_encryption_mode_desc": "Isso determina quando a criptografia será usada durante a transmissão pela Internet. A criptografia pode reduzir o desempenho da transmissão, principalmente em hosts e clientes menos potentes.",
+    "changed_count": "{count} alteradas",
+    "unsaved_changes": "Alterações não salvas",
+    "saved_not_applied": "Salvo. Aplique para reiniciar o Sunshine com as novas configurações.",
+    "no_unsaved_changes": "Nenhuma alteração pendente",
+    "save_and_apply": "Salvar e aplicar"
   },
   "index": {
     "permissions_missing_title": "O Sunshine precisa de permissões",
@@ -522,7 +530,31 @@
     "virtualhid_outdated_desc": "A versão do driver libvirtualhid instalada (v{version}) não é suportada. Versões suportadas: {supported_versions}.",
     "virtualhid_outdated_title": "Motorista libvirtualhid desatualizado",
     "virtualhid_required_desc": "O Virtual HID Driver está selecionado, mas não está instalado. Instale-a e ative uma licença paga, ou escolha um driver de controle diferente na configuração de entrada.",
-    "welcome": "Olá, Sunshine!"
+    "welcome": "Olá, Sunshine!",
+    "status_ready": "Pronto para transmitir",
+    "status_ready_desc": "Clientes Moonlight na sua rede podem se conectar a este host.",
+    "status_attention": "Precisa de atenção",
+    "status_attention_desc": "Algo neste host precisa ser revisto para a transmissão funcionar como esperado.",
+    "view_logs": "Ver logs",
+    "pairing_request_title": "{name} quer parear",
+    "pairing_request_desc": "Digite o PIN mostrado no Moonlight para concluir o pareamento.",
+    "pair": "Parear",
+    "other_requests": "Mais {count} pedidos aguardando na página de Pareamento",
+    "paired_devices": "Dispositivos pareados",
+    "manage": "Gerenciar",
+    "client_disabled": "Desativado",
+    "no_paired_devices": "Nenhum dispositivo pareado ainda.",
+    "host": "Host",
+    "platform": "Plataforma",
+    "gamepad": "Controle",
+    "gamepad_disabled": "Desativado",
+    "needs_attention": "Precisa de atenção",
+    "ok": "OK",
+    "permissions": "Permissões",
+    "startup": "Inicialização",
+    "startup_failed": "Falhou",
+    "version": "Versão {version}",
+    "release_notes": "Notas da versão"
   },
   "navbar": {
     "applications": "Aplicativos",
@@ -558,7 +590,11 @@
     "theme_slate": "Ardósia",
     "theme_sunshine": "Luz Solar",
     "toggle_theme": "Tema",
-    "troubleshoot": "Solução de problemas"
+    "troubleshoot": "Solução de problemas",
+    "account": "Conta",
+    "main_navigation": "Navegação principal",
+    "pairing": "Pareamento",
+    "toggle_navigation": "Alternar navegação"
   },
   "logout": {
     "logged_out": "Sessão encerrada",
@@ -589,7 +625,13 @@
     "send": "Enviar",
     "unknown_address": "Endereço desconhecido",
     "unknown_device": "Dispositivo desconhecido",
-    "warning_msg": "Certifique-se de ter acesso ao cliente com o qual está fazendo o emparelhamento. Esse software pode dar controle total ao seu computador, portanto, tenha cuidado!"
+    "warning_msg": "Certifique-se de ter acesso ao cliente com o qual está fazendo o emparelhamento. Esse software pode dar controle total ao seu computador, portanto, tenha cuidado!",
+    "page_desc": "Pareie um novo cliente Moonlight e gerencie os dispositivos já pareados.",
+    "waiting_title": "Pedidos aguardando",
+    "enter_pin": "Digite o PIN",
+    "pin_from_moonlight": "O PIN de 4 dígitos que o Moonlight mostra no dispositivo.",
+    "client_enabled": "Ativado",
+    "remove": "Remover"
   },
   "resource_card": {
     "documentation": "Documentação",
@@ -740,7 +782,15 @@
     "virtualhid_license_state_licensed": "Licenciado",
     "virtualhid_license_state_unavailable": "Unavailable",
     "virtualhid_license_state_unlicensed": "Sem licença",
-    "virtualhid_macos_license_desc": "Uma licença de máquina ativa é necessária para gamepads virtuais no macOS. O corretor deve ser instalado, em execução e permitido em Configurações do Sistema > Privacidade e Segurança > Controle de Dispositivos e Acesso de Dados. O sol envia ações de licença para o corretor local e não salva a sua chave."
+    "virtualhid_macos_license_desc": "Uma licença de máquina ativa é necessária para gamepads virtuais no macOS. O corretor deve ser instalado, em execução e permitido em Configurações do Sistema > Privacidade e Segurança > Controle de Dispositivos e Acesso de Dados. O sol envia ações de licença para o corretor local e não salva a sua chave.",
+    "page_desc": "Reinicie serviços, corrija entrada e captura, e leia os logs.",
+    "on_this_page": "Nesta página",
+    "actions": "Ações",
+    "unpair_moved": "Os dispositivos pareados foram para a página de Pareamento.",
+    "logs_level": "Nível do log",
+    "logs_level_all": "Todos",
+    "logs_level_warning": "Avisos",
+    "logs_level_error": "Erros"
   },
   "featured": {
     "category_filter": "Filtro de categoria",

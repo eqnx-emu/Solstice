@@ -1,78 +1,66 @@
 <template>
   <Navbar></Navbar>
-  <div id="content" class="container">
-    <h1 class="my-4 text-center">{{ $t('pin.pin_pairing') }}</h1>
-    <form class="form d-flex flex-column align-items-center" id="form" @submit.prevent="registerDevice">
-      <div class="card flex-column d-flex p-4 mb-4">
-        <div class="input-group mt-2">
-          <label for="pairing-input" class="visually-hidden">{{ $t('pin.select_pairing') }}</label>
-          <span class="input-group-text">
-            <user-round-search :size="18" class="icon"></user-round-search>
-          </span>
-          <select v-model="selectedPairingId" class="form-select" id="pairing-input" required>
-            <option disabled value="">
-              {{ pendingPairings.length ? $t('pin.select_pairing') : $t('pin.no_pending_pairings') }}
-            </option>
-            <option v-for="pairing in pendingPairings" :key="pairing.id" :value="pairing.id">
-              {{ pairing.name || $t('pin.unknown_device') }} — {{ pairing.address || $t('pin.unknown_address') }}
-            </option>
-          </select>
-          <button
-            type="button"
-            class="btn btn-outline-danger"
-            :disabled="!selectedPairingId"
-            :title="$t('pin.cancel_pairing')"
-            @click="cancelSelectedPairing"
-          >
-            <x :size="18" class="icon"></x>
-          </button>
-        </div>
-        <div class="input-group mt-2">
-          <label for="pin-input" class="visually-hidden">{{ $t('navbar.pin') }}</label>
-          <span class="input-group-text">
-            <hash :size="18" class="icon"></hash>
-          </span>
-          <input v-model="pin" type="text" pattern="\d{4}" maxlength="4" inputmode="numeric" :placeholder="`${$t('navbar.pin')}`" id="pin-input" class="form-control" required />
-        </div>
-        <div class="input-group my-4">
-          <label for="name-input" class="visually-hidden">{{ $t('pin.device_name') }}</label>
-          <span class="input-group-text">
-            <monitor :size="18" class="icon"></monitor>
-          </span>
-          <input v-model="name" type="text" :placeholder="`${$t('pin.device_name')}`" id="name-input" class="form-control" required />
-        </div>
-        <button type="submit" class="btn btn-primary">
-          <forward :size="18" class="icon"></forward>
-          {{ $t('pin.send') }}
-        </button>
+  <main id="content" class="container sx-page">
+    <header class="sx-page-header">
+      <div>
+        <h1>{{ $t('pin.pin_pairing') }}</h1>
+        <p class="sx-hint">{{ $t('pin.page_desc') }}</p>
       </div>
-      <div class="alert alert-warning">
-        <b>{{ $t('_common.warning') }}</b> {{ $t('pin.warning_msg') }}
-      </div>
-      <div v-if="status" :class="`alert alert-${status.type}`" role="alert">{{ status.message }}</div>
+    </header>
+
+    <form id="form" class="sx-split" @submit.prevent="registerDevice">
+      <section class="sx-panel sx-wide">
+        <div class="sx-panel-head"><h2>{{ $t('pin.waiting_title') }}</h2></div>
+        <fieldset class="sx-panel-body d-flex flex-column gap-2 border-0 m-0">
+          <legend class="sx-hint mb-2">{{ $t('pin.select_pairing') }}</legend>
+          <label class="sx-pick" v-for="pairing in pendingPairings" :key="pairing.id">
+            <input type="radio" name="pairing" :value="pairing.id" v-model="selectedPairingId" required>
+            <span class="flex-grow-1">
+              <span class="d-block fw-medium">{{ pairing.name || $t('pin.unknown_device') }}</span>
+              <span class="sx-mono sx-hint">{{ pairing.address || $t('pin.unknown_address') }}</span>
+            </span>
+          </label>
+          <p v-if="!pendingPairings.length" class="sx-hint mb-0">{{ $t('pin.no_pending_pairings') }}</p>
+          <div>
+            <button type="button" class="btn btn-sx-danger mt-2" :disabled="!selectedPairingId" @click="cancelSelectedPairing">
+              {{ $t('pin.cancel_pairing') }}
+            </button>
+          </div>
+        </fieldset>
+      </section>
+
+      <section class="sx-panel sx-narrow">
+        <div class="sx-panel-head"><h2>{{ $t('pin.enter_pin') }}</h2></div>
+        <div class="sx-panel-body d-flex flex-column gap-3">
+          <div>
+            <label for="pin-input" class="form-label">{{ $t('pin.pin_from_moonlight') }}</label>
+            <input v-model="pin" type="text" pattern="\d{4}" maxlength="4" inputmode="numeric" placeholder="0000"
+                   id="pin-input" class="form-control sx-pin-input" required />
+          </div>
+          <div>
+            <label for="name-input" class="form-label">{{ $t('pin.device_name') }}</label>
+            <input v-model="name" type="text" id="name-input" class="form-control" required />
+          </div>
+          <button type="submit" class="btn btn-accent">{{ $t('pin.send') }}</button>
+          <div v-if="status" :class="`alert alert-${status.type} mb-0`" role="alert">{{ status.message }}</div>
+          <p class="sx-callout"><b>{{ $t('_common.warning') }}</b> {{ $t('pin.warning_msg') }}</p>
+        </div>
+      </section>
     </form>
-  </div>
+
+    <PairedDevices ref="pairedDevices"></PairedDevices>
+  </main>
 </template>
 
 <script>
   import Navbar from './Navbar.vue'
+  import PairedDevices from './PairedDevices.vue'
   import { apiFetch } from './fetch_utils'
-  import {
-    Forward,
-    Hash,
-    Monitor,
-    UserRoundSearch,
-    X,
-  } from '@lucide/vue'
 
   export default {
     components: {
       Navbar,
-      Forward,
-      Hash,
-      Monitor,
-      UserRoundSearch,
-      X,
+      PairedDevices,
     },
     inject: ['i18n'],
     data() {
@@ -84,6 +72,15 @@
         selectedPairingId: '',
         status: null,
       };
+    },
+    watch: {
+      /** Offer the requesting device's own name so the operator only types the PIN. */
+      selectedPairingId(id) {
+        const selected = this.pendingPairings.find((pairing) => pairing.id === id);
+        if (selected && !this.name) {
+          this.name = selected.name || '';
+        }
+      },
     },
     mounted() {
       this.loadPendingPairings();
@@ -141,6 +138,7 @@
           this.status = {type: 'success', message: this.i18n.t('pin.pair_success')};
           this.pin = '';
           this.name = '';
+          this.$refs.pairedDevices?.refreshClients();
         } else {
           this.status = {type: 'danger', message: this.i18n.t('pin.pair_failure')};
         }
