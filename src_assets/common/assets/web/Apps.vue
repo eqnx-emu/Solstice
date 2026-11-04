@@ -1,109 +1,78 @@
 <template>
   <Navbar></Navbar>
-  <div id="content" class="container">
-    <div class="my-4">
-      <h1>{{ $t('apps.applications_title') }}<span v-if="apps.length"> ({{ appCountLabel }})</span></h1>
-      <p>{{ $t('apps.applications_desc') }}</p>
-    </div>
+  <main id="content" class="container sx-page">
+    <header class="sx-page-header">
+      <div>
+        <h1>{{ $t('apps.applications_title') }}<span v-if="apps.length"> ({{ appCountLabel }})</span></h1>
+        <p class="sx-hint">{{ $t('apps.applications_desc') }}</p>
+      </div>
+      <div class="sx-page-actions">
+        <RouterLink class="btn btn-sx" to="/featured">{{ $t('navbar.featured') }}</RouterLink>
+        <button class="btn btn-primary" @click="newApp">{{ $t('apps.add_new') }}</button>
+      </div>
+    </header>
 
-    <!-- Actions toolbar -->
-    <div class="toolbar apps-toolbar d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-      <!-- Left side actions -->
-      <div class="d-flex align-items-center gap-2">
-        <!-- Add new application -->
-        <button class="btn btn-primary" @click="newApp">
-          <layers-plus :size="18" class="icon"></layers-plus>
-          {{ $t('apps.add_new') }}
+    <!-- Search and sort -->
+    <div class="d-flex flex-wrap align-items-center gap-2" v-if="apps && apps.length > 0">
+      <div class="input-group flex-grow-1" style="max-width: 28rem">
+        <label for="app-search" class="visually-hidden">{{ $t('apps.search_placeholder') }}</label>
+        <input id="app-search" type="search" class="form-control" v-model="searchQuery" :placeholder="$t('apps.search_placeholder')" />
+        <button v-if="searchQuery" class="btn btn-sx" type="button" @click="resetSearchQuery" :aria-label="$t('_common.close')">
+          <x :size="16" class="icon"></x>
         </button>
       </div>
-      <!-- Right side actions -->
-      <div class="d-flex align-items-center gap-2" v-if="apps && apps.length > 0">
-        <!-- Sort by name toggle -->
-        <button class="btn btn-outline-secondary text-nowrap" type="button" @click="toggleSort"
-                :class="{ active: sortMode !== 'default' }"
-                :aria-pressed="sortMode !== 'default'"
-                :title="$t('apps.sort_by_name') + ': ' + sortModeLabel">
-          <arrow-up-down v-if="sortMode === 'default'" :size="16" class="icon me-1"></arrow-up-down>
-          <arrow-up v-else-if="sortMode === 'asc'" :size="16" class="icon me-1"></arrow-up>
-          <arrow-down v-else :size="16" class="icon me-1"></arrow-down>
-          {{ $t('apps.sort_by_name') }}
-        </button>
-        <!-- Search box -->
-        <div class="input-group">
-          <label for="app-search" class="visually-hidden">{{ $t('apps.search_placeholder') }}</label>
-          <input id="app-search" type="text" class="form-control" v-model="searchQuery" :placeholder="$t('apps.search_placeholder')" />
-          <button v-if="searchQuery" class="btn btn-outline-secondary" type="button" @click="resetSearchQuery" :aria-label="$t('_common.close')">
-            <x :size="16" class="icon"></x>
-          </button>
-          <span v-else class="input-group-text">
-            <search :size="16" class="icon"></search>
-          </span>
-        </div>
-      </div>
+      <button class="btn btn-sx text-nowrap" type="button" @click="toggleSort"
+              :class="{ active: sortMode !== 'default' }"
+              :aria-pressed="sortMode !== 'default'"
+              :title="$t('apps.sort_by_name') + ': ' + sortModeLabel">
+        <arrow-up-down v-if="sortMode === 'default'" :size="16" class="icon"></arrow-up-down>
+        <arrow-up v-else-if="sortMode === 'asc'" :size="16" class="icon"></arrow-up>
+        <arrow-down v-else :size="16" class="icon"></arrow-down>
+        {{ $t('apps.sort_by_name') }}
+      </button>
     </div>
 
-    <!-- Apps Grid -->
-    <div class="row g-3" v-if="displayedApps.length > 0">
-      <div class="col-12 col-sm-6 col-md-4 col-lg-3" v-for="{ app, index } in displayedApps" :key="index">
-        <div class="card app-card h-100">
-          <div class="app-poster-container">
-            <img
-              v-if="app['image-path']"
-              :src="'/api/covers/' + index"
-              class="app-poster"
-              :alt="app.name"
-              @error="handleImageError"
-            />
-            <div v-else class="app-poster-placeholder">
-              <span class="app-initial">{{ app.name.charAt(0).toUpperCase() }}</span>
-            </div>
-            <div class="app-poster-overlay">
-              <div v-if="app.cmd" class="app-overlay-row" :title="app.cmd">
-                <terminal :size="14" class="icon me-1"></terminal>
-                <span class="app-detail-text">{{ app.cmd }}</span>
-              </div>
-              <div v-if="app['working-dir']" class="app-overlay-row" :title="app['working-dir']">
-                <folder :size="14" class="icon me-1"></folder>
-                <span class="app-detail-text">{{ app['working-dir'] }}</span>
-              </div>
-              <div class="app-overlay-badges">
-                <span v-if="app.elevated" class="badge app-flag-badge">{{ $t('apps.badge_admin') }}</span>
-                <span v-if="app.detached && app.detached.length" class="badge app-flag-badge">{{ $t('apps.badge_detached') }}</span>
-                <span v-if="app['prep-cmd'] && app['prep-cmd'].length" class="badge app-flag-badge">{{ $t('apps.badge_app_prep') }}</span>
-                <span v-if="app['exclude-global-prep-cmd']" class="badge app-flag-badge">{{ $t('apps.badge_no_global_prep') }}</span>
-                <span v-if="app['auto-detach']" class="badge app-flag-badge">{{ $t('apps.badge_auto_detach') }}</span>
-              </div>
-            </div>
+    <!-- Apps list -->
+    <section class="sx-panel" v-if="displayedApps.length > 0" :aria-label="$t('apps.applications_title')">
+      <ul class="sx-rows">
+        <li class="sx-row app-card" v-for="{ app, index } in displayedApps" :key="index">
+          <div class="sx-app-cover" aria-hidden="true">
+            <img v-if="app['image-path']" :src="'/api/covers/' + index" class="app-poster" alt="" @error="handleImageError" />
+            <span v-else class="app-initial">{{ app.name.charAt(0).toUpperCase() }}</span>
           </div>
-          <div class="card-body d-flex flex-column">
-            <h5 class="card-title mb-3">{{ app.name }}</h5>
-            <div class="mt-auto d-flex gap-2">
-              <button class="btn btn-sm btn-primary flex-fill" @click="editApp(index)">
-                <edit :size="16" class="icon"></edit>
-                {{ $t('apps.edit') }}
-              </button>
-              <button class="btn btn-sm btn-danger" @click="showDeleteModal(index)">
-                <trash-2 :size="16" class="icon"></trash-2>
-              </button>
-            </div>
+          <div class="sx-row-main">
+            <p class="fw-semibold">{{ app.name }}</p>
+            <p class="sx-app-cmd" v-if="app.cmd" :title="app.cmd">{{ app.cmd }}</p>
+            <p class="sx-app-cmd" v-else-if="app.detached && app.detached.length" :title="app.detached[0]">{{ app.detached[0] }}</p>
           </div>
-        </div>
-      </div>
-    </div>
+          <div class="d-flex flex-wrap gap-1">
+            <span v-if="app.elevated" class="sx-tag app-flag-badge">{{ $t('apps.badge_admin') }}</span>
+            <span v-if="app.detached && app.detached.length" class="sx-tag app-flag-badge">{{ $t('apps.badge_detached') }}</span>
+            <span v-if="app['prep-cmd'] && app['prep-cmd'].length" class="sx-tag app-flag-badge">{{ $t('apps.badge_app_prep') }}</span>
+            <span v-if="app['exclude-global-prep-cmd']" class="sx-tag app-flag-badge">{{ $t('apps.badge_no_global_prep') }}</span>
+            <span v-if="app['auto-detach']" class="sx-tag app-flag-badge">{{ $t('apps.badge_auto_detach') }}</span>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sx" @click="editApp(index)">{{ $t('apps.edit') }}</button>
+            <button class="btn btn-sx-danger" @click="showDeleteModal(index)" :aria-label="$t('apps.delete') + ': ' + app.name">
+              <trash-2 :size="16" class="icon"></trash-2>
+            </button>
+          </div>
+        </li>
+      </ul>
+    </section>
 
     <!-- No search results -->
-    <div v-else-if="apps && apps.length > 0" class="card">
-      <div class="card-body text-center py-5">
-        <p class="text-muted">{{ $t('apps.no_search_results') }}</p>
-      </div>
-    </div>
+    <section v-else-if="apps && apps.length > 0" class="sx-dashed p-4 d-flex flex-wrap align-items-center gap-3">
+      <p class="sx-hint flex-grow-1 mb-0">{{ $t('apps.no_search_results') }}</p>
+      <button class="btn btn-sx" type="button" @click="resetSearchQuery">{{ $t('apps.clear_search') }}</button>
+    </section>
 
     <!-- Empty State -->
-    <div v-else class="card">
-      <div class="card-body text-center py-5">
-        <p class="text-muted">{{ $t('apps.no_applications') }}</p>
-      </div>
-    </div>
+    <section v-else class="sx-dashed p-4 d-flex flex-wrap align-items-center gap-3">
+      <p class="sx-hint flex-grow-1 mb-0">{{ $t('apps.no_applications') }}</p>
+      <button class="btn btn-primary" @click="newApp">{{ $t('apps.add_new') }}</button>
+    </section>
 
     <!-- Edit / Add Application modal -->
     <div class="modal fade" ref="editModal" tabindex="-1" aria-labelledby="appEditModalLabel"
@@ -120,25 +89,62 @@
           <div class="modal-body">
             <!-- Error -->
             <div v-if="editFormError" class="alert alert-danger py-2 small">{{ editFormError }}</div>
+            <section class="sx-edit-section">
+              <h3>{{ $t('apps.section_basic') }}</h3>
             <!-- Application Name -->
             <div class="mb-3">
               <label for="appName" class="form-label">{{ $t('apps.app_name') }}</label>
               <input type="text" class="form-control" id="appName" aria-describedby="appNameHelp" v-model="editForm.name" />
               <div id="appNameHelp" class="form-text">{{ $t('apps.app_name_desc') }}</div>
             </div>
-            <!-- output -->
+            <!-- command -->
             <div class="mb-3">
-              <label for="appOutput" class="form-label">{{ $t('apps.output_name') }}</label>
+              <label for="appCmd" class="form-label">{{ $t('apps.cmd') }}</label>
               <div class="input-group">
-                <input type="text" class="form-control monospace" id="appOutput" aria-describedby="appOutputHelp"
-                  v-model="editForm.output" />
+                <input type="text" class="form-control monospace" id="appCmd" aria-describedby="appCmdHelp"
+                  v-model="editForm.cmd" />
                 <button class="btn btn-secondary" type="button"
-                  @click="browseFor('any', 'file_browser.select_file', editForm.output, v => editForm.output = v)">
+                  @click="browseFor('executable', 'file_browser.select_executable', editForm.cmd, v => editForm.cmd = v)">
                   <folder-open :size="18" class="icon"></folder-open>
                 </button>
               </div>
-              <div id="appOutputHelp" class="form-text">{{ $t('apps.output_desc') }}</div>
+              <div id="appCmdHelp" class="form-text">
+                {{ $t('apps.cmd_desc') }}<br>
+                <b>{{ $t('_common.note') }}</b> {{ $t('apps.cmd_note') }}
+              </div>
             </div>
+            <!-- working dir -->
+            <div class="mb-3">
+              <label for="appWorkingDir" class="form-label">{{ $t('apps.working_dir') }}</label>
+              <div class="input-group">
+                <input type="text" class="form-control monospace" id="appWorkingDir" aria-describedby="appWorkingDirHelp"
+                  v-model="editForm['working-dir']" />
+                <button class="btn btn-secondary" type="button"
+                  @click="browseFor('directory', 'file_browser.select_directory', editForm['working-dir'], v => editForm['working-dir'] = v)">
+                  <folder-open :size="18" class="icon"></folder-open>
+                </button>
+              </div>
+              <div id="appWorkingDirHelp" class="form-text">{{ $t('apps.working_dir_desc') }}</div>
+            </div>
+            <div class="mb-3">
+              <label for="appImagePath" class="form-label">{{ $t('apps.image') }}</label>
+              <div class="input-group">
+                <input type="text" class="form-control monospace" id="appImagePath" aria-describedby="appImagePathHelp"
+                  v-model="editForm['image-path']" />
+                <button class="btn btn-secondary" type="button"
+                  @click="browseFor('file', 'file_browser.select_file', editForm['image-path'], v => editForm['image-path'] = v, ['.png'])">
+                  <folder-open :size="18" class="icon"></folder-open>
+                </button>
+                <button class="btn btn-secondary" type="button" @click="showCoverFinder">
+                  <search :size="18" class="icon"></search>
+                  {{ $t('apps.find_cover') }}
+                </button>
+              </div>
+              <div id="appImagePathHelp" class="form-text">{{ $t('apps.image_desc') }}</div>
+            </div>
+            </section>
+            <section class="sx-edit-section">
+              <h3>{{ $t('apps.cmd_prep_name') }}</h3>
             <!-- prep-cmd -->
             <Checkbox class="mb-3"
                       id="excludeGlobalPrep"
@@ -149,7 +155,6 @@
                       inverse-values
             ></Checkbox>
             <div class="mb-3">
-              <label for="appName" class="form-label">{{ $t('apps.cmd_prep_name') }}</label>
               <div class="form-text">{{ $t('apps.cmd_prep_desc') }}</div>
               <div class="d-flex justify-content-start mb-3 mt-3" v-if="editForm['prep-cmd'].length === 0">
                 <button class="btn btn-success" @click="addPrepCmd">
@@ -214,9 +219,11 @@
                 </tbody>
               </table>
             </div>
+            </section>
+            <section class="sx-edit-section">
+              <h3>{{ $t('apps.detached_cmds') }}</h3>
             <!-- detached -->
             <div class="mb-3">
-              <label for="appName" class="form-label">{{ $t('apps.detached_cmds') }}</label>
               <div v-for="(c,i) in editForm.detached" :key="i" class="d-flex justify-content-between align-items-center my-2">
                 <label :for="`detached-command-${i}`" class="visually-hidden">{{ $t('apps.detached_cmds') }}</label>
                 <input :id="`detached-command-${i}`" type="text" v-model="editForm.detached[i]" class="form-control monospace">
@@ -241,35 +248,9 @@
                 <b>{{ $t('_common.note') }}</b> {{ $t('apps.detached_cmds_note') }}
               </div>
             </div>
-            <!-- command -->
-            <div class="mb-3">
-              <label for="appCmd" class="form-label">{{ $t('apps.cmd') }}</label>
-              <div class="input-group">
-                <input type="text" class="form-control monospace" id="appCmd" aria-describedby="appCmdHelp"
-                  v-model="editForm.cmd" />
-                <button class="btn btn-secondary" type="button"
-                  @click="browseFor('executable', 'file_browser.select_executable', editForm.cmd, v => editForm.cmd = v)">
-                  <folder-open :size="18" class="icon"></folder-open>
-                </button>
-              </div>
-              <div id="appCmdHelp" class="form-text">
-                {{ $t('apps.cmd_desc') }}<br>
-                <b>{{ $t('_common.note') }}</b> {{ $t('apps.cmd_note') }}
-              </div>
-            </div>
-            <!-- working dir -->
-            <div class="mb-3">
-              <label for="appWorkingDir" class="form-label">{{ $t('apps.working_dir') }}</label>
-              <div class="input-group">
-                <input type="text" class="form-control monospace" id="appWorkingDir" aria-describedby="appWorkingDirHelp"
-                  v-model="editForm['working-dir']" />
-                <button class="btn btn-secondary" type="button"
-                  @click="browseFor('directory', 'file_browser.select_directory', editForm['working-dir'], v => editForm['working-dir'] = v)">
-                  <folder-open :size="18" class="icon"></folder-open>
-                </button>
-              </div>
-              <div id="appWorkingDirHelp" class="form-text">{{ $t('apps.working_dir_desc') }}</div>
-            </div>
+            </section>
+            <section class="sx-edit-section">
+              <h3>{{ $t('apps.section_execution') }}</h3>
             <!-- elevation -->
             <Checkbox v-if="platform === 'windows'"
                       class="mb-3"
@@ -302,27 +283,23 @@
                      v-model="editForm['exit-timeout']" min="0" placeholder="5" />
               <div id="exitTimeoutHelp" class="form-text">{{ $t('apps.exit_timeout_desc') }}</div>
             </div>
+            <!-- output -->
             <div class="mb-3">
-              <label for="appImagePath" class="form-label">{{ $t('apps.image') }}</label>
+              <label for="appOutput" class="form-label">{{ $t('apps.output_name') }}</label>
               <div class="input-group">
-                <input type="text" class="form-control monospace" id="appImagePath" aria-describedby="appImagePathHelp"
-                  v-model="editForm['image-path']" />
+                <input type="text" class="form-control monospace" id="appOutput" aria-describedby="appOutputHelp"
+                  v-model="editForm.output" />
                 <button class="btn btn-secondary" type="button"
-                  @click="browseFor('file', 'file_browser.select_file', editForm['image-path'], v => editForm['image-path'] = v, ['.png'])">
+                  @click="browseFor('any', 'file_browser.select_file', editForm.output, v => editForm.output = v)">
                   <folder-open :size="18" class="icon"></folder-open>
                 </button>
-                <button class="btn btn-secondary" type="button" @click="showCoverFinder">
-                  <search :size="18" class="icon"></search>
-                  {{ $t('apps.find_cover') }}
-                </button>
               </div>
-              <div id="appImagePathHelp" class="form-text">{{ $t('apps.image_desc') }}</div>
+              <div id="appOutputHelp" class="form-text">{{ $t('apps.output_desc') }}</div>
             </div>
-            <div class="env-hint alert alert-info">
-              <div class="form-text">
-                <h4>{{ $t('apps.env_vars_about') }}</h4>
-                {{ $t('apps.env_vars_desc') }}
-              </div>
+            </section>
+            <details class="sx-edit-section env-hint">
+              <summary>{{ $t('apps.env_vars_about') }}</summary>
+              <p class="form-text">{{ $t('apps.env_vars_desc') }}</p>
               <table class="env-table">
                 <tr>
                   <th scope="col">{{ $t('apps.env_var_name') }}</th>
@@ -385,7 +362,7 @@
               <div class="form-text"><a
                   :href="`${documentationBaseUrl}/md_docs_2app__examples.html`"
                   target="_blank">{{ $t('_common.see_more') }}</a></div>
-            </div>
+            </details>
           </div>
           <!-- Save buttons -->
           <div class="modal-footer">
@@ -563,7 +540,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </main>
 </template>
 
 <script>
@@ -579,20 +556,17 @@
     ArrowUp,
     ArrowUpDown,
     Check,
-    Edit,
     FileText,
     Folder,
     FolderOpen,
     FolderUp,
     HardDrive,
-    LayersPlus,
     Play,
     Plus,
     RotateCcw,
     Save,
     Search,
     Shield,
-    Terminal,
     Trash2,
     X,
   } from '@lucide/vue'
@@ -663,20 +637,17 @@
       ArrowUp,
       ArrowUpDown,
       Check,
-      Edit,
       FileText,
       Folder,
       FolderOpen,
       FolderUp,
       HardDrive,
-      LayersPlus,
       Play,
       Plus,
       RotateCcw,
       Save,
       Search,
       Shield,
-      Terminal,
       Trash2,
       X,
     },

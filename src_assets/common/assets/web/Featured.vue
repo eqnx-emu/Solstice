@@ -1,9 +1,12 @@
 <template>
   <Navbar></Navbar>
-  <div id="content" class="container">
-    <div class="my-4">
-      <h1>{{ $t('featured.title') }}</h1>
-      <p>{{ $t('featured.description') }}</p>
+  <main id="content" class="container sx-page">
+    <div class="sx-page-header">
+      <div>
+        <router-link to="/apps" class="sx-hint d-inline-block mb-2">← {{ $t('navbar.applications') }}</router-link>
+        <h1>{{ $t('featured.title') }}</h1>
+        <p class="sx-hint">{{ $t('featured.description') }}</p>
+      </div>
     </div>
 
     <!-- Category Filter -->
@@ -251,7 +254,7 @@
         <img :src="selectedScreenshot" alt="Screenshot" />
       </div>
     </div>
-  </div>
+  </main>
 </template>
 
 <script>

@@ -1,10 +1,12 @@
 <template>
   <Navbar></Navbar>
-  <div id="content" class="container">
-    <div class="my-4">
-      <h1>{{ $t('config.configuration') }}</h1>
-      <p>{{ $t('config.configuration_desc') }}</p>
-    </div>
+  <main id="content" class="container sx-page">
+    <header class="sx-page-header">
+      <div>
+        <h1>{{ $t('config.configuration') }}</h1>
+        <p class="sx-hint">{{ $t('config.configuration_desc') }}</p>
+      </div>
+    </header>
 
     <!-- Search Bar with Autocomplete -->
     <div class="toolbar mb-3 d-flex flex-wrap align-items-center gap-3">
@@ -45,7 +47,8 @@
               <button type="button" class="nav-link" :class="{'active': tab.id === currentTab}"
                 @click="currentTab = tab.id">
                 <component :is="getTabIcon(tab.id)" :size="18" class="icon"></component>
-                {{ $t(tab.nameKey) }}
+                <span class="flex-grow-1">{{ $t(tab.nameKey) }}</span>
+                <span class="sx-tag" v-if="changedCount(tab)">{{ $t('config.changed_count', { count: changedCount(tab) }) }}</span>
               </button>
             </li>
           </ul>
@@ -56,22 +59,13 @@
                 <button type="button" class="nav-link" :class="{'active': tab.id === currentTab}"
                   @click="currentTab = tab.id">
                   <component :is="getTabIcon(tab.id)" :size="18" class="icon"></component>
-                  {{ $t(tab.nameKey) }}
+                  <span class="flex-grow-1">{{ $t(tab.nameKey) }}</span>
+                  <span class="sx-tag" v-if="changedCount(tab)">{{ $t('config.changed_count', { count: changedCount(tab) }) }}</span>
                 </button>
               </li>
             </ul>
           </template>
 
-          <div class="config-actions">
-            <button class="btn btn-primary" @click="save">
-              <save :size="18" class="icon"></save>
-              {{ $t('_common.save') }}
-            </button>
-            <button class="btn btn-success" @click="apply" v-if="saved && !restarted">
-              <check :size="18" class="icon"></check>
-              {{ $t('_common.apply') }}
-            </button>
-          </div>
         </nav>
 
         <!-- Tab content -->
@@ -133,9 +127,24 @@
       </container-encoders>
         </div>
       </div>
+
+      <div class="sx-sticky-bar mt-4 config-actions">
+        <p>
+          <strong v-if="dirty">{{ $t('config.unsaved_changes') }}</strong>
+          <strong v-else-if="saved && !restarted">{{ $t('config.saved_not_applied') }}</strong>
+          <strong v-else>{{ $t('config.no_unsaved_changes') }}</strong>
+          <span class="sx-hint ms-1">{{ $t('config.apply_note') }}</span>
+        </p>
+        <button class="btn btn-sx" @click="save" :disabled="!dirty">
+          {{ $t('_common.save') }}
+        </button>
+        <button class="btn btn-primary" @click="apply" :disabled="!dirty && !(saved && !restarted)">
+          {{ $t('config.save_and_apply') }}
+        </button>
+      </div>
     </div>
 
-  </div>
+  </main>
 </template>
 
 <script>
@@ -222,6 +231,7 @@
         restarted: false,
         config: null,
         currentTab: "general",
+        savedSnapshot: null,
         searchQuery: "",
         hashChangeHandler: null,
         // Keep a private copy because platform filtering replaces this array at runtime.
@@ -235,6 +245,10 @@
        }
     },
     computed: {
+      /** Whether the form differs from what the server last returned or accepted. */
+      dirty() {
+        return this.config !== null && this.savedSnapshot !== null && JSON.stringify(this.config) !== this.savedSnapshot;
+      },
       generalTabs() {
         return this.tabs.filter(tab => !ENCODER_TAB_IDS.has(tab.id));
       },
@@ -309,9 +323,17 @@
               }
             });
           });
+          this.savedSnapshot = JSON.stringify(this.config);
         });
     },
     methods: {
+      /** Count options in a tab that differ from Sunshine's defaults. */
+      changedCount(tab) {
+        if (!this.config) {
+          return 0;
+        }
+        return Object.keys(tab.options).filter(key => !configValuesEqual(this.config[key], tab.options[key])).length;
+      },
       getTabIcon(tabId) {
         const iconMap = {
           'general': 'Settings',
@@ -361,6 +383,7 @@
         }).then((r) => {
           if (r.status === 200) {
             this.saved = true
+            this.savedSnapshot = JSON.stringify(this.config)
             return this.saved
           }
           else {

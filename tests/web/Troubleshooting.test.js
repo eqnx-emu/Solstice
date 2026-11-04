@@ -109,7 +109,8 @@ describe('virtual input troubleshooting', () => {
       expect(wrapper.get('.permission-table-shell th').text()).toBe(
         malformed ? en.troubleshooting.permissions_name : catalog.troubleshooting.permissions_name
       )
-      expect(wrapper.get('#unpair').text()).toBe(catalog.troubleshooting.unpair_title)
+      // Device management moved to the pairing page; the actions list points there.
+      expect(wrapper.text()).toContain(catalog.troubleshooting.unpair_title)
       expect(wrapper.get('#logs').text()).toBe(catalog.troubleshooting.logs)
       expect(wrapper.find('.permission-table-shell tbody tr').exists()).toBe(true)
     } finally {

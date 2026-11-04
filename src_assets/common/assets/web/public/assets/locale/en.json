@@ -105,7 +105,10 @@
     "wait_all": "Continue streaming until all app processes exit",
     "wait_all_desc": "This will continue streaming until all processes started by the app have terminated. When unchecked, streaming will stop when the initial app process exits, even if other app processes are still running.",
     "working_dir": "Working Directory",
-    "working_dir_desc": "The working directory that should be passed to the process. For example, some applications use the working directory to search for configuration files. If not set, Sunshine will default to the parent directory of the command"
+    "working_dir_desc": "The working directory that should be passed to the process. For example, some applications use the working directory to search for configuration files. If not set, Sunshine will default to the parent directory of the command",
+    "clear_search": "Clear search",
+    "section_basic": "Basics",
+    "section_execution": "Execution"
   },
   "config": {
     "adapter_name": "Adapter Name",
@@ -482,7 +485,12 @@
     "wan_encryption_mode": "WAN Encryption Mode",
     "wan_encryption_mode_1": "Enabled for supported clients (default)",
     "wan_encryption_mode_2": "Required for all clients",
-    "wan_encryption_mode_desc": "This determines when encryption will be used when streaming over the Internet. Encryption can reduce streaming performance, particularly on less powerful hosts and clients."
+    "wan_encryption_mode_desc": "This determines when encryption will be used when streaming over the Internet. Encryption can reduce streaming performance, particularly on less powerful hosts and clients.",
+    "changed_count": "{count} changed",
+    "unsaved_changes": "Unsaved changes",
+    "saved_not_applied": "Saved. Apply to restart Sunshine with the new settings.",
+    "no_unsaved_changes": "No unsaved changes",
+    "save_and_apply": "Save and apply"
   },
   "index": {
     "permissions_missing_title": "Sunshine needs permissions",
@@ -522,7 +530,31 @@
     "virtualhid_outdated_desc": "The installed libvirtualhid driver version (v{version}) is not supported. Supported versions: {supported_versions}.",
     "virtualhid_outdated_title": "libvirtualhid Driver Outdated",
     "virtualhid_required_desc": "Virtual HID Broker is selected, but it is not installed. Install it and activate a paid license, or choose a different gamepad driver in Input configuration.",
-    "welcome": "Hello, Sunshine!"
+    "welcome": "Hello, Sunshine!",
+    "status_ready": "Ready to stream",
+    "status_ready_desc": "Moonlight clients on your network can connect to this host.",
+    "status_attention": "Needs attention",
+    "status_attention_desc": "Something on this host needs a look before streaming works as expected.",
+    "view_logs": "View logs",
+    "pairing_request_title": "{name} wants to pair",
+    "pairing_request_desc": "Enter the PIN shown in Moonlight to finish pairing.",
+    "pair": "Pair",
+    "other_requests": "{count} more requests waiting on the Pairing page",
+    "paired_devices": "Paired devices",
+    "manage": "Manage",
+    "client_disabled": "Disabled",
+    "no_paired_devices": "No paired devices yet.",
+    "host": "Host",
+    "platform": "Platform",
+    "gamepad": "Gamepad",
+    "gamepad_disabled": "Disabled",
+    "needs_attention": "Needs attention",
+    "ok": "OK",
+    "permissions": "Permissions",
+    "startup": "Startup",
+    "startup_failed": "Failed",
+    "version": "Version {version}",
+    "release_notes": "Release notes"
   },
   "navbar": {
     "applications": "Applications",
@@ -558,7 +590,11 @@
     "theme_slate": "Slate",
     "theme_sunshine": "Sunshine",
     "toggle_theme": "Theme",
-    "troubleshoot": "Troubleshooting"
+    "troubleshoot": "Troubleshooting",
+    "account": "Account",
+    "main_navigation": "Main navigation",
+    "pairing": "Pairing",
+    "toggle_navigation": "Toggle navigation"
   },
   "logout": {
     "logged_out": "Logged Out",
@@ -589,7 +625,13 @@
     "send": "Send",
     "unknown_address": "Unknown address",
     "unknown_device": "Unknown device",
-    "warning_msg": "Make sure you have access to the client you are pairing with. This software can give total control to your computer, so be careful!"
+    "warning_msg": "Make sure you have access to the client you are pairing with. This software can give total control to your computer, so be careful!",
+    "page_desc": "Pair a new Moonlight client and manage the devices already paired.",
+    "waiting_title": "Waiting requests",
+    "enter_pin": "Enter PIN",
+    "pin_from_moonlight": "The 4-digit PIN Moonlight shows on the device.",
+    "client_enabled": "Enabled",
+    "remove": "Remove"
   },
   "resource_card": {
     "documentation": "Documentation",
@@ -740,7 +782,15 @@
     "virtualhid_license_state_licensed": "Licensed",
     "virtualhid_license_state_unavailable": "Unavailable",
     "virtualhid_license_state_unlicensed": "Unlicensed",
-    "virtualhid_macos_license_desc": "An active machine license is required for virtual gamepads on macOS. The broker must be installed, running, and allowed under System Settings > Privacy & Security > Device Control and Data Access. Sunshine sends license actions to the local broker and does not save your key."
+    "virtualhid_macos_license_desc": "An active machine license is required for virtual gamepads on macOS. The broker must be installed, running, and allowed under System Settings > Privacy & Security > Device Control and Data Access. Sunshine sends license actions to the local broker and does not save your key.",
+    "page_desc": "Restart services, fix input and capture, and read the logs.",
+    "on_this_page": "On this page",
+    "actions": "Actions",
+    "unpair_moved": "Paired devices moved to the Pairing page.",
+    "logs_level": "Log level",
+    "logs_level_all": "All",
+    "logs_level_warning": "Warnings",
+    "logs_level_error": "Errors"
   },
   "featured": {
     "category_filter": "Category filter",

@@ -1,7 +1,16 @@
 <template>
   <Navbar></Navbar>
-  <div id="content" class="container">
-    <h1 class="my-4">{{ $t('troubleshooting.troubleshooting') }}</h1>
+  <main id="content" class="container sx-page">
+    <header class="d-flex flex-column gap-2">
+      <h1 class="mb-0">{{ $t('troubleshooting.troubleshooting') }}</h1>
+      <p class="sx-hint">{{ $t('troubleshooting.page_desc') }}</p>
+      <nav class="sx-jump" :aria-label="$t('troubleshooting.on_this_page')">
+        <a href="#actions">{{ $t('troubleshooting.actions') }}</a>
+        <a href="#virtualhid" v-if="platform === 'windows' || platform === 'macos'">{{ $t('troubleshooting.virtual_gamepad') }}</a>
+        <a href="#permissions" v-if="permissions.length || permissionError">{{ $t('troubleshooting.permissions_title') }}</a>
+        <a href="#logs">{{ $t('troubleshooting.logs') }}</a>
+      </nav>
+    </header>
     <div class="card my-4" v-if="permissions.length || permissionError">
       <div class="card-body">
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-2">
@@ -345,140 +354,66 @@
         </section>
       </div>
     </div>
-    <!-- Force Close App -->
-    <div class="card my-4">
-      <div class="card-body">
-        <h2 id="close_apps">{{ $t('troubleshooting.force_close') }}</h2>
-        <p>{{ $t('troubleshooting.force_close_desc') }}</p>
-        <div class="alert alert-success" v-if="closeAppStatus === true">
-          <check-circle :size="18" class="icon"></check-circle>
-          {{ $t('troubleshooting.force_close_success') }}
-        </div>
-        <div class="alert alert-danger" v-if="closeAppStatus === false">
-          <alert-circle :size="18" class="icon"></alert-circle>
-          {{ $t('troubleshooting.force_close_error') }}
-        </div>
-        <div>
-          <button class="btn btn-warning" :disabled="closeAppPressed" @click="closeApp">
-            <x-circle :size="18" class="icon"></x-circle>
-            {{ $t('troubleshooting.force_close') }}
-          </button>
-        </div>
-      </div>
-    </div>
-    <!-- Restart Sunshine -->
-    <div class="card my-4">
-      <div class="card-body">
-        <h2 id="restart">{{ $t('troubleshooting.restart_sunshine') }}</h2>
-        <p>{{ $t('troubleshooting.restart_sunshine_desc') }}</p>
-        <div class="alert alert-success" v-if="restartPressed === true">
-          <check-circle :size="18" class="icon"></check-circle>
-          {{ $t('troubleshooting.restart_sunshine_success') }}
-        </div>
-        <div>
-          <button class="btn btn-warning" :disabled="restartPressed" @click="restart">
-            <refresh-cw :size="18" class="icon"></refresh-cw>
-            {{ $t('troubleshooting.restart_sunshine') }}
-          </button>
-        </div>
-      </div>
-    </div>
-    <!-- Reset XDG Portal restore token -->
-    <div class="card my-4" v-if="platform === 'linux' || platform === 'freebsd'">
-      <div class="card-body">
-        <h2 id="portal_reset">{{ $t('troubleshooting.portal_reset') }}</h2>
-        <p>{{ $t('troubleshooting.portal_reset_desc') }}</p>
-        <div class="alert alert-success" v-if="portalResetStatus === true">
-          <check-circle :size="18" class="icon"></check-circle>
-          {{ $t('troubleshooting.portal_reset_success') }}
-        </div>
-        <div class="alert alert-danger" v-if="portalResetStatus === false">
-          <alert-circle :size="18" class="icon"></alert-circle>
-          {{ $t('troubleshooting.portal_reset_error') }}
-        </div>
-        <div>
-          <button class="btn btn-warning" :disabled="portalResetPressed" @click="resetPortalToken">
-            <rotate-ccw :size="18" class="icon"></rotate-ccw>
-            {{ $t('troubleshooting.portal_reset') }}
-          </button>
-        </div>
-      </div>
-    </div>
-    <!-- Reset persistent display device settings -->
-    <div class="card my-4" v-if="platform === 'windows'">
-      <div class="card-body">
-        <h2 id="dd_reset">{{ $t('troubleshooting.dd_reset') }}</h2>
-        <p style="white-space: pre-line">{{ $t('troubleshooting.dd_reset_desc') }}</p>
-        <div class="alert alert-success" v-if="ddResetStatus === true">
-          <check-circle :size="18" class="icon"></check-circle>
-          {{ $t('troubleshooting.dd_reset_success') }}
-        </div>
-        <div class="alert alert-danger" v-if="ddResetStatus === false">
-          <alert-circle :size="18" class="icon"></alert-circle>
-          {{ $t('troubleshooting.dd_reset_error') }}
-        </div>
-        <div>
-          <button class="btn btn-warning" :disabled="ddResetPressed" @click="ddResetPersistence">
-            <rotate-ccw :size="18" class="icon"></rotate-ccw>
-            {{ $t('troubleshooting.dd_reset') }}
-          </button>
-        </div>
-      </div>
-    </div>
-    <!-- Unpair Clients -->
-    <div class="card my-4">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h2 id="unpair" class="mb-0">{{ $t('troubleshooting.unpair_title') }}</h2>
-          <button class="btn btn-danger" :disabled="unpairAllPressed" @click="unpairAll">
-            <trash-2 :size="18" class="icon"></trash-2>
-            {{ $t('troubleshooting.unpair_all') }}
-          </button>
-        </div>
-        <p>{{ $t('troubleshooting.unpair_desc') }}</p>
-        <div class="alert alert-success d-flex align-items-center" v-if="showApplyMessage">
-          <check-circle :size="18" class="icon"></check-circle>
-          <div><b>{{ $t('_common.success') }}</b> {{ $t('troubleshooting.unpair_single_success') }}</div>
-          <button class="btn btn-success ms-auto" @click="clickedApplyBanner">{{ $t('_common.dismiss') }}</button>
-        </div>
-        <div class="alert alert-success" v-if="unpairAllStatus === true">
-          <check-circle :size="18" class="icon"></check-circle>
-          {{ $t('troubleshooting.unpair_all_success') }}
-        </div>
-        <div class="alert alert-danger" v-if="unpairAllStatus === false">
-          <alert-circle :size="18" class="icon"></alert-circle>
-          {{ $t('troubleshooting.unpair_all_error') }}
-        </div>
-      </div>
-      <ul class="list-group list-group-flush" v-if="clients && clients.length > 0">
-        <li v-for="client in clients" :key="client.uuid" class="list-group-item d-flex align-items-center">
-          <div class="flex-grow-1">
-            {{ client.name !== "" ? client.name : $t('troubleshooting.unpair_single_unknown') }}
+    <!-- One list of recovery actions, each with the same shape -->
+    <section class="sx-panel" aria-labelledby="actions">
+      <div class="sx-panel-head"><h2 id="actions">{{ $t('troubleshooting.actions') }}</h2></div>
+      <ul class="sx-rows">
+        <li class="sx-row">
+          <div class="sx-row-main">
+            <p class="fw-medium" id="close_apps">{{ $t('troubleshooting.force_close') }}</p>
+            <p class="sx-hint">{{ $t('troubleshooting.force_close_desc') }}</p>
+            <p class="sx-ok" v-if="closeAppStatus === true" role="status">{{ $t('troubleshooting.force_close_success') }}</p>
+            <p class="sx-bad" v-if="closeAppStatus === false" role="status">{{ $t('troubleshooting.force_close_error') }}</p>
           </div>
-          <div class="form-check form-switch ms-2 mb-0">
-            <input class="form-check-input" type="checkbox" role="switch"
-                   :id="'toggle-' + client.uuid"
-                   :checked="client.enabled"
-                   :aria-checked="client.enabled.toString()"
-                   @change="toggleClient(client.uuid, !client.enabled)">
+          <button class="btn btn-sx" :disabled="closeAppPressed" @click="closeApp">{{ $t('troubleshooting.force_close') }}</button>
+        </li>
+        <li class="sx-row">
+          <div class="sx-row-main">
+            <p class="fw-medium" id="restart">{{ $t('troubleshooting.restart_sunshine') }}</p>
+            <p class="sx-hint">{{ $t('troubleshooting.restart_sunshine_desc') }}</p>
+            <p class="sx-ok" v-if="restartPressed === true" role="status">{{ $t('troubleshooting.restart_sunshine_success') }}</p>
           </div>
-          <button class="btn btn-danger btn-sm ms-2" @click="unpairSingle(client.uuid)">
-            <trash-2 :size="18" class="icon"></trash-2>
-          </button>
+          <button class="btn btn-sx" :disabled="restartPressed" @click="restart">{{ $t('troubleshooting.restart_sunshine') }}</button>
+        </li>
+        <li class="sx-row" v-if="platform === 'linux' || platform === 'freebsd'">
+          <div class="sx-row-main">
+            <p class="fw-medium" id="portal_reset">{{ $t('troubleshooting.portal_reset') }}</p>
+            <p class="sx-hint">{{ $t('troubleshooting.portal_reset_desc') }}</p>
+            <p class="sx-ok" v-if="portalResetStatus === true" role="status">{{ $t('troubleshooting.portal_reset_success') }}</p>
+            <p class="sx-bad" v-if="portalResetStatus === false" role="status">{{ $t('troubleshooting.portal_reset_error') }}</p>
+          </div>
+          <button class="btn btn-sx-danger" :disabled="portalResetPressed" @click="resetPortalToken">{{ $t('troubleshooting.portal_reset') }}</button>
+        </li>
+        <li class="sx-row" v-if="platform === 'windows'">
+          <div class="sx-row-main">
+            <p class="fw-medium" id="dd_reset">{{ $t('troubleshooting.dd_reset') }}</p>
+            <p class="sx-hint" style="white-space: pre-line">{{ $t('troubleshooting.dd_reset_desc') }}</p>
+            <p class="sx-ok" v-if="ddResetStatus === true" role="status">{{ $t('troubleshooting.dd_reset_success') }}</p>
+            <p class="sx-bad" v-if="ddResetStatus === false" role="status">{{ $t('troubleshooting.dd_reset_error') }}</p>
+          </div>
+          <button class="btn btn-sx-danger" :disabled="ddResetPressed" @click="ddResetPersistence">{{ $t('troubleshooting.dd_reset') }}</button>
+        </li>
+        <li class="sx-row">
+          <div class="sx-row-main">
+            <p class="fw-medium">{{ $t('troubleshooting.unpair_title') }}</p>
+            <p class="sx-hint">{{ $t('troubleshooting.unpair_moved') }}</p>
+          </div>
+          <RouterLink class="btn btn-sx" to="/pin">{{ $t('navbar.pairing') }}</RouterLink>
         </li>
       </ul>
-      <ul v-else class="list-group list-group-flush">
-        <li class="list-group-item p-3 text-center">
-          <em>{{ $t('troubleshooting.unpair_single_no_devices') }}</em>
-        </li>
-      </ul>
-    </div>
+    </section>
     <!-- Logs -->
     <div class="card my-4">
       <div class="card-body">
         <h2 id="logs">{{ $t('troubleshooting.logs') }}</h2>
-        <div class="d-flex justify-content-between align-items-baseline py-2">
-          <p>{{ $t('troubleshooting.logs_desc') }}</p>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 py-2">
+          <p class="sx-hint mb-0">{{ $t('troubleshooting.logs_desc') }}</p>
+          <div class="sx-chip-group" role="group" :aria-label="$t('troubleshooting.logs_level')">
+            <button v-for="level in logLevels" :key="level.id" type="button" class="sx-chip"
+                    :aria-pressed="logLevel === level.id" @click="logLevel = level.id">
+              {{ $t(level.label) }}
+            </button>
+          </div>
           <div class="input-group" style="max-width: 300px">
             <label for="log-filter" class="visually-hidden">{{ $t('troubleshooting.logs_find') }}</label>
             <span class="input-group-text">
@@ -514,7 +449,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </main>
 
 </template>
 
@@ -538,7 +473,6 @@
       KeyRound,
       MousePointer2,
       RefreshCw,
-      RotateCcw,
       Search,
       ShieldCheck,
       Sparkles,
@@ -567,7 +501,6 @@
         KeyRound,
         MousePointer2,
         RefreshCw,
-        RotateCcw,
         Search,
         ShieldCheck,
         Sparkles,
@@ -576,7 +509,6 @@
       },
       data() {
         return {
-          clients: [],
           closeAppPressed: false,
           closeAppStatus: null,
           ddResetPressed: false,
@@ -584,6 +516,12 @@
           logsCopied: false,
           logs: 'Loading...',
           logFilter: null,
+          logLevel: 'all',
+          logLevels: [
+            { id: 'all', label: 'troubleshooting.logs_level_all' },
+            { id: 'warning', label: 'troubleshooting.logs_level_warning' },
+            { id: 'error', label: 'troubleshooting.logs_level_error' },
+          ],
           logInterval: null,
           licenseBusy: false,
           licenseError: '',
@@ -595,11 +533,8 @@
           permissionError: '',
           permissionHelp: '',
           restartPressed: false,
-          showApplyMessage: false,
           platform: "",
           gamepadDriver: '',
-          unpairAllPressed: false,
-          unpairAllStatus: null,
           virtualhid: {
             installed: false,
             version: '',
@@ -683,10 +618,15 @@
         },
 
         actualLogs() {
-          if (!this.logFilter) return this.logs;
-          const filterLower = this.logFilter.toLowerCase();
-          return this.logs
+          const levelPattern = {
+            warning: /: (Warning|Error|Fatal):/,
+            error: /: (Error|Fatal):/,
+          }[this.logLevel];
+          if (!this.logFilter && !levelPattern) return this.logs;
+          const filterLower = (this.logFilter || '').toLowerCase();
+          return (this.logs || '')
             .split("\n")
+            .filter((x) => !levelPattern || levelPattern.test(x))
             .filter((x) => x.toLowerCase().includes(filterLower))
             .join("\n");
         },
@@ -825,7 +765,6 @@
           if (this.platform) this.refreshPermissions();
         }, 5000);
         this.refreshLogs();
-        this.refreshClients();
       },
       beforeUnmount() {
         clearInterval(this.logInterval);
@@ -885,63 +824,6 @@
                 this.closeAppStatus = null;
               }, 5000);
             });
-        },
-        unpairAll() {
-          this.unpairAllPressed = true;
-          apiFetch("./api/clients/unpair-all", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            }
-           })
-            .then((r) => r.json())
-            .then((r) => {
-              this.unpairAllPressed = false;
-              this.unpairAllStatus = r.status;
-              setTimeout(() => {
-                this.unpairAllStatus = null;
-              }, 5000);
-              this.refreshClients();
-            });
-        },
-        unpairSingle(uuid) {
-          apiFetch("./api/clients/unpair", {
-            method: "POST",
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ uuid })
-          }).then(() => {
-            this.showApplyMessage = true;
-            this.refreshClients();
-          });
-        },
-        toggleClient(uuid, enabled) {
-          fetch("./api/clients/update", {
-            method: "POST",
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ uuid, enabled })
-          }).then(() => {
-            this.refreshClients();
-          });
-        },
-        refreshClients() {
-          fetch("./api/clients/list")
-            .then((response) => response.json())
-            .then((response) => {
-              if (response.status === true && response.named_certs && response.named_certs.length) {
-                this.clients = response.named_certs.sort((a, b) => {
-                  return (a.name.toLowerCase() > b.name.toLowerCase() || a.name === "" ? 1 : -1)
-                });
-              } else {
-                this.clients = [];
-              }
-            });
-        },
-        clickedApplyBanner() {
-          this.showApplyMessage = false;
         },
         copyLogs() {
           // Copy the filtered view if a filter is active.

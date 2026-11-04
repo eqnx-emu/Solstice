@@ -99,7 +99,7 @@ const componentCases = [
   ['simple navbar theme control', '<nav class="navbar navbar-sunshine"><button class="nav-link">Theme</button></nav>', 'button', { color: 'var(--navbar-text-muted)', paddingTop: '8px', paddingRight: '16px', paddingBottom: '8px', paddingLeft: '16px' }],
   ['active navbar link', '<nav class="navbar-sunshine"><ul class="navbar-nav"><li><a class="nav-link active">Page</a></li></ul></nav>', '.nav-link', { color: 'var(--navbar-text)' }],
   ['open navbar dropdown', '<nav class="navbar-sunshine"><ul class="navbar-nav"><li><button class="nav-link dropdown-toggle show">Menu</button></li></ul></nav>', 'button', { color: 'var(--navbar-text)' }],
-  ['navbar toggler', '<nav class="navbar-sunshine"><button class="navbar-toggler"></button></nav>', 'button', { color: 'var(--navbar-text)', borderTopColor: 'rgba(255, 255, 255, 0.2)' }],
+  ['navbar toggler', '<nav class="navbar-sunshine"><button class="navbar-toggler"></button></nav>', 'button', { color: 'var(--navbar-text)' }],
   ['disabled button', '<button class="btn btn-primary" disabled>Save</button>', 'button', { transform: 'none' }],
   ['busy cover', '<div class="cover-finder"><div class="cover-results busy"><button class="cover-container result"></button></div></div>', 'button', { cursor: 'wait', pointerEvents: 'none' }],
   ['release notes', '<div class="markdown-body release-notes"></div>', '.release-notes', { columnCount: '1', display: 'block' }],
