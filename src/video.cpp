@@ -1504,8 +1504,9 @@ namespace video {
    * @param dev_type The encoder device type used for display lookup.
    * @param display_names The list of display names to repopulate.
    * @param current_display_index The current display index or -1 if not yet known.
+   * @return `false` if the previously active display is missing from the new list.
    */
-  void refresh_displays(platf::mem_type_e dev_type, std::vector<std::string> &display_names, int &current_display_index) {
+  bool refresh_displays(platf::mem_type_e dev_type, std::vector<std::string> &display_names, int &current_display_index) {
     // It is possible that the output name may be empty even if it wasn't before (device disconnected) or vice-versa
     const auto output_name {display_device::map_output_name(config::video.output_name)};
     std::string current_display_name;
@@ -1523,7 +1524,7 @@ namespace video {
     if (display_names.empty() && !old_display_names.empty()) {
       BOOST_LOG(error) << "No displays were found after reenumeration!"sv;
       display_names = std::move(old_display_names);
-      return;
+      return false;
     } else if (display_names.empty()) {
       display_names.emplace_back(output_name);
     }
@@ -1536,20 +1537,29 @@ namespace video {
       for (int x = 0; x < display_names.size(); ++x) {
         if (display_names[x] == current_display_name) {
           current_display_index = x;
-          return;
+          return true;
         }
       }
 
-      // The old display was removed, so we'll start back at the first display again
+      // The old display was removed. Prefer the configured output over whatever enumerates first,
+      // which may be a different display or even a different GPU.
       BOOST_LOG(warning) << "Previous active display ["sv << current_display_name << "] is no longer present"sv;
+      for (int x = 0; x < display_names.size(); ++x) {
+        if (display_names[x] == output_name) {
+          current_display_index = x;
+          break;
+        }
+      }
+      return false;
     } else {
       for (int x = 0; x < display_names.size(); ++x) {
         if (display_names[x] == output_name) {
           current_display_index = x;
-          return;
+          return true;
         }
       }
     }
+    return true;
   }
 
   /**
@@ -1782,8 +1792,18 @@ namespace video {
               // only support a single display session per device/application.
               disp.reset();
 
-              // Refresh display names since a display removal might have caused the reinitialization
-              refresh_displays(encoder.platform_formats->dev_type, display_names, display_p);
+              // Refresh display names since a display removal might have caused the reinitialization.
+              // Driver and topology events can hide the active display from enumeration for a moment.
+              // Give it a few seconds to come back before capturing a different display (#5765).
+              const auto previous_display_name {display_p >= 0 && display_p < static_cast<int>(display_names.size()) ? display_names[display_p] : std::string {}};
+              bool previous_display_present {refresh_displays(encoder.platform_formats->dev_type, display_names, display_p)};
+              for (int attempt = 0; !previous_display_present && !previous_display_name.empty() && attempt < 10 && capture_ctx_queue->running(); ++attempt) {
+                std::this_thread::sleep_for(300ms);
+                int previous_index {0};
+                display_names.assign(1, previous_display_name);
+                previous_display_present = refresh_displays(encoder.platform_formats->dev_type, display_names, previous_index);
+                display_p = previous_index;
+              }
 
               // Process any pending display switch with the new list of displays
               if (switch_display_event->peek()) {

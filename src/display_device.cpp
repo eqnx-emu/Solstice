@@ -46,6 +46,94 @@ namespace display_device {
   namespace {
     constexpr std::chrono::milliseconds DEFAULT_RETRY_INTERVAL {5000};
 
+#ifdef _WIN32
+    /**
+     * @brief Display device that saves mode changes to Windows' display database while the user's layout is active.
+     *
+     * Not saving CCD changes keeps a temporary topology (e.g. switching to a virtual display) from becoming the
+     * saved layout. Applied to display modes as well, it makes them temporary: if Windows powers the displays
+     * off, it restores the saved mode a moment after Sunshine changed it, and the revert later fails (#5942).
+     * Modes are therefore saved whenever the topology is the one Sunshine found, and left unsaved while a
+     * topology Sunshine applied is in effect.
+     */
+    class win_mode_saving_display_device_t: public WinDisplayDeviceInterface {
+    public:
+      explicit win_mode_saving_display_device_t(const std::shared_ptr<WinApiLayerInterface> &w_api):
+          m_unsaved {std::make_shared<WinDisplayDevice>(w_api, false)},
+          m_saved {std::make_shared<WinDisplayDevice>(w_api, true)} {
+      }
+
+      [[nodiscard]] bool isApiAccessAvailable() const override {
+        return m_unsaved->isApiAccessAvailable();
+      }
+
+      [[nodiscard]] EnumeratedDeviceList enumAvailableDevices() const override {
+        return m_unsaved->enumAvailableDevices();
+      }
+
+      [[nodiscard]] std::string getDisplayName(const std::string &device_id) const override {
+        return m_unsaved->getDisplayName(device_id);
+      }
+
+      [[nodiscard]] ActiveTopology getCurrentTopology() const override {
+        return m_unsaved->getCurrentTopology();
+      }
+
+      [[nodiscard]] bool isTopologyValid(const ActiveTopology &topology) const override {
+        return m_unsaved->isTopologyValid(topology);
+      }
+
+      [[nodiscard]] bool isTopologyTheSame(const ActiveTopology &lhs, const ActiveTopology &rhs) const override {
+        return m_unsaved->isTopologyTheSame(lhs, rhs);
+      }
+
+      [[nodiscard]] bool setTopology(const ActiveTopology &new_topology) override {
+        if (!m_original_topology) {
+          m_original_topology = m_unsaved->getCurrentTopology();
+        }
+
+        if (!m_unsaved->setTopology(new_topology)) {
+          return false;
+        }
+
+        if (m_unsaved->isTopologyTheSame(*m_original_topology, new_topology)) {
+          m_original_topology.reset();
+        }
+        return true;
+      }
+
+      [[nodiscard]] DeviceDisplayModeMap getCurrentDisplayModes(const StringSet &device_ids) const override {
+        return m_unsaved->getCurrentDisplayModes(device_ids);
+      }
+
+      [[nodiscard]] bool setDisplayModes(const DeviceDisplayModeMap &modes) override {
+        const bool temporary_topology_active {m_original_topology.has_value()};
+        return (temporary_topology_active ? m_unsaved : m_saved)->setDisplayModes(modes);
+      }
+
+      [[nodiscard]] bool isPrimary(const std::string &device_id) const override {
+        return m_unsaved->isPrimary(device_id);
+      }
+
+      [[nodiscard]] bool setAsPrimary(const std::string &device_id) override {
+        return m_unsaved->setAsPrimary(device_id);
+      }
+
+      [[nodiscard]] HdrStateMap getCurrentHdrStates(const StringSet &device_ids) const override {
+        return m_unsaved->getCurrentHdrStates(device_ids);
+      }
+
+      [[nodiscard]] bool setHdrStates(const HdrStateMap &states) override {
+        return m_unsaved->setHdrStates(states);
+      }
+
+    private:
+      std::shared_ptr<WinDisplayDevice> m_unsaved;  ///< Applies changes without saving them to the display database.
+      std::shared_ptr<WinDisplayDevice> m_saved;  ///< Applies changes and saves them to the display database.
+      std::optional<ActiveTopology> m_original_topology;  ///< Topology before Sunshine changed it, while a change is in effect.
+    };
+#endif
+
     /**
      * @brief Persistence wrapper that remembers whether a settings record is still stored.
      *
@@ -741,7 +829,7 @@ namespace display_device {
       DD_DATA.persistence_watch.reset();
 #ifdef _WIN32
       return std::make_unique<SettingsManager>(
-        std::make_shared<WinDisplayDevice>(std::make_shared<WinApiLayer>(), false),
+        std::make_shared<win_mode_saving_display_device_t>(std::make_shared<WinApiLayer>()),
         std::make_shared<sunshine_audio_context_t>(),
         std::make_unique<PersistentState>(make_persistence_watch(persistence_filepath)),
         WinWorkarounds {
