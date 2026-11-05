@@ -605,6 +605,29 @@ namespace config {
     }
   }  // namespace sw
 
+  namespace vd {
+    /**
+     * @brief Parse the virtual display policy from configuration text.
+     *
+     * @param value Configuration text from the virtual display setting.
+     * @return Parsed enum value, or `disabled` when the text is unknown.
+     */
+    video_t::virtual_display_e virtual_display_from_view(const std::string_view value) {
+#ifndef DOXYGEN
+  #define _CONVERT_(x) \
+    if (value == #x##sv) \
+    return video_t::virtual_display_e::x
+#endif
+      _CONVERT_(disabled);
+      _CONVERT_(apps);
+      _CONVERT_(always);
+#ifndef DOXYGEN
+  #undef _CONVERT_
+#endif
+      return video_t::virtual_display_e::disabled;  // Default to this if value is invalid
+    }
+  }  // namespace vd
+
   namespace dd {
     /**
      * @brief Parse display-device preparation mode from configuration text.
@@ -818,7 +841,8 @@ namespace config {
     },  // display_device
 
     0,  // max_bitrate
-    0  // minimum_fps_target (0 = framerate)
+    0,  // minimum_fps_target (0 = framerate)
+    video_t::virtual_display_e::disabled  // virtual_display
   };
 
   /**
@@ -1733,6 +1757,7 @@ namespace config {
     string_f(vars, "encoder", video.encoder);
     string_f(vars, "adapter_name", video.adapter_name);
     string_f(vars, "output_name", video.output_name);
+    generic_f(vars, "virtual_display", video.virtual_display, vd::virtual_display_from_view);
 
     generic_f(vars, "dd_configuration_option", video.dd.configuration_option, dd::config_option_from_view);
     generic_f(vars, "dd_resolution_option", video.dd.resolution_option, dd::resolution_option_from_view);

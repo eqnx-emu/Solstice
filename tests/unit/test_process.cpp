@@ -27,9 +27,11 @@
 #endif
 
 // local includes
+#include <src/config.h>
 #include <src/process.h>
 #include <src/process_gamepad.h>
 #include <src/utility.h>
+#include <src/virtual_display.h>
 
 namespace fs = std::filesystem;
 
@@ -900,4 +902,61 @@ TEST_F(ProcessRefreshTest, RunningAppGamepadFollowsTheLaunchedApp) {
 
 TEST_F(ProcessUpdateTest, GlobalRunningAppGamepadReadsTheGlobalProcess) {
   EXPECT_EQ(proc::running_app_gamepad(), "");
+}
+
+TEST(ProcessTest, ParseAppVirtualDisplay) {
+  EXPECT_EQ(proc::parse_app_virtual_display("enabled"), "enabled");
+  EXPECT_EQ(proc::parse_app_virtual_display("disabled"), "disabled");
+  EXPECT_EQ(proc::parse_app_virtual_display(""), "");
+  EXPECT_EQ(proc::parse_app_virtual_display("bogus"), "");
+}
+
+TEST_F(ProcessRefreshTest, Parse_ReadsAppVirtualDisplayOverride) {
+  const fs::path apps_file = test_dir / "apps_virtual_display.json";
+  {
+    std::ofstream file(apps_file);
+    file << R"({ "env": {}, "apps": [
+      { "name": "OnGame", "virtual-display": "enabled" },
+      { "name": "OffGame", "virtual-display": "disabled" },
+      { "name": "DefaultGame" },
+      { "name": "BadGame", "virtual-display": "bogus" }
+    ] })";
+  }
+
+  auto parsed = proc::parse(apps_file.string());
+
+  ASSERT_TRUE(parsed.has_value());
+  const auto &apps = parsed->get_apps();
+  ASSERT_EQ(apps.size(), 4u);
+  EXPECT_EQ(apps[0].virtual_display, "enabled");
+  EXPECT_EQ(apps[1].virtual_display, "disabled");
+  EXPECT_EQ(apps[2].virtual_display, "");
+  EXPECT_EQ(apps[3].virtual_display, "");
+}
+
+TEST_F(ProcessRefreshTest, GetAppVirtualDisplayFindsTheAppById) {
+  boost::process::v1::environment env = boost::this_process::environment();
+  std::vector<proc::ctx_t> apps;
+  proc::ctx_t ctx;
+  ctx.name = "VdGame";
+  ctx.id = "42";
+  ctx.virtual_display = "enabled";
+  apps.push_back(std::move(ctx));
+  proc::proc_t target(std::move(env), std::move(apps));
+
+  EXPECT_EQ(target.get_app_virtual_display(42), "enabled");
+  EXPECT_EQ(target.get_app_virtual_display(43), "");
+}
+
+TEST(VirtualDisplayTest, ShouldUseVirtualDisplay) {
+  using enum config::video_t::virtual_display_e;
+  EXPECT_TRUE(virtual_display::should_use(disabled, "enabled"));
+  EXPECT_TRUE(virtual_display::should_use(apps, "enabled"));
+  EXPECT_TRUE(virtual_display::should_use(always, "enabled"));
+  EXPECT_FALSE(virtual_display::should_use(disabled, "disabled"));
+  EXPECT_FALSE(virtual_display::should_use(apps, "disabled"));
+  EXPECT_FALSE(virtual_display::should_use(always, "disabled"));
+  EXPECT_FALSE(virtual_display::should_use(disabled, ""));
+  EXPECT_FALSE(virtual_display::should_use(apps, ""));
+  EXPECT_TRUE(virtual_display::should_use(always, ""));
 }

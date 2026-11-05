@@ -1148,6 +1148,57 @@ consent prompt for directory ACLs, so the Web UI shows setup steps for correctin
     </tr>
 </table>
 
+### virtual_display
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Stream from a dedicated virtual display created for each session instead of a physical monitor.
+            The virtual display uses the resolution and refresh rate requested by the client and is removed when the session ends.
+            If the Solstice virtual display driver is missing or fails, streaming falls back to the physical display.
+            <br>
+            <br>
+            - `disabled`: Never use a virtual display, unless an app enables it.
+            <br>
+            - `apps`: Use a virtual display only for apps whose "Virtual Display" option is enabled.
+            <br>
+            - `always`: Use a virtual display for every app, except those that disable it.
+            <br>
+            <br>
+            Each app can override this setting with its own `virtual-display` option (`enabled` or `disabled`).
+            @note{Applies to Windows only.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            disabled
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            virtual_display = apps
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Choices</td>
+        <td>disabled</td>
+        <td>Never use a virtual display, unless an app enables it.</td>
+    </tr>
+    <tr>
+        <td></td>
+        <td>apps</td>
+        <td>Use a virtual display only for apps that enable it.</td>
+    </tr>
+    <tr>
+        <td></td>
+        <td>always</td>
+        <td>Use a virtual display for every app, except those that disable it.</td>
+    </tr>
+</table>
+
 ### dd_configuration_option
 
 <table>

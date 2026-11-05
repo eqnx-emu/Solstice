@@ -232,6 +232,17 @@ namespace config {
 
     int max_bitrate;  ///< Maximum bitrate ceiling in kbps for bitrate requested from the client.
     double minimum_fps_target;  ///< Lowest framerate that will be used when streaming. Range 0-1000, 0 = half of client's requested framerate.
+
+    /**
+     * @brief Selects when Sunshine streams from a dedicated virtual display.
+     */
+    enum class virtual_display_e {
+      disabled,  ///< Never create a virtual display.
+      apps,  ///< Create a virtual display only for apps that enable it.
+      always  ///< Create a virtual display for every app except those that disable it.
+    };
+
+    virtual_display_e virtual_display;  ///< Virtual display policy selected by configuration.
   };
 
   /**

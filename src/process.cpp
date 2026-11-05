@@ -445,6 +445,13 @@ namespace proc {
     return _app.name;
   }
 
+  std::string proc_t::get_app_virtual_display(int app_id) const {
+    const auto iter = std::ranges::find_if(_apps, [app_id](const auto &app) {
+      return app.id == std::to_string(app_id);
+    });
+    return iter == _apps.end() ? std::string {} : iter->virtual_display;
+  }
+
   std::string proc_t::get_running_app_gamepad() const {
     if (_app_id <= 0 && !placebo) {
       return {};
@@ -464,6 +471,17 @@ namespace proc {
       return std::string {value};
     }
     BOOST_LOG(warning) << "Ignoring unsupported app gamepad type: "sv << value;
+    return {};
+  }
+
+  std::string parse_app_virtual_display(std::string_view value) {
+    if (value.empty()) {
+      return {};
+    }
+    if (value == "enabled"sv || value == "disabled"sv) {
+      return std::string {value};
+    }
+    BOOST_LOG(warning) << "Ignoring unsupported app virtual-display value: "sv << value;
     return {};
   }
 
@@ -785,6 +803,7 @@ namespace proc {
         auto wait_all = app_node.get_optional<bool>("wait-all"s);
         auto exit_timeout = app_node.get_optional<int>("exit-timeout"s);
         auto gamepad = app_node.get_optional<std::string>("gamepad"s);
+        auto virtual_display = app_node.get_optional<std::string>("virtual-display"s);
 
         std::vector<proc::cmd_t> prep_cmds;
         if (!exclude_global_prep.value_or(false)) {
@@ -855,6 +874,7 @@ namespace proc {
         ctx.wait_all = wait_all.value_or(true);
         ctx.exit_timeout = std::chrono::seconds {exit_timeout.value_or(5)};
         ctx.gamepad = parse_app_gamepad(gamepad.value_or(""));
+        ctx.virtual_display = parse_app_virtual_display(virtual_display.value_or(""));
 
         auto possible_ids = calculate_app_id(name, ctx.image_path, i++);
         if (ids.count(std::get<0>(possible_ids)) == 0) {

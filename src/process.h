@@ -80,6 +80,7 @@ namespace proc {
     bool wait_all;  ///< Whether Sunshine waits for all child processes.
     std::chrono::seconds exit_timeout;  ///< Exit timeout.
     std::string gamepad;  ///< Gamepad type for this app, or empty to use the global setting.
+    std::string virtual_display;  ///< "enabled", "disabled", or empty to follow the global virtual display setting.
   };
 
   /**
@@ -139,6 +140,13 @@ namespace proc {
      * @return Validated image path for the requested application.
      */
     std::string get_app_image(int app_id);
+    /**
+     * @brief Get the virtual display override of an application.
+     *
+     * @param app_id App ID.
+     * @return The app's "enabled" or "disabled" override, or an empty string when it follows the global setting or is unknown.
+     */
+    std::string get_app_virtual_display(int app_id) const;
     /**
      * @brief Get last run app name.
      *
@@ -242,6 +250,14 @@ namespace proc {
    * @return The override, or an empty string when the value is empty or unsupported.
    */
   std::string parse_app_gamepad(std::string_view value);
+
+  /**
+   * @brief Normalize an application's virtual display override.
+   *
+   * @param value Raw "virtual-display" value from apps.json.
+   * @return "enabled" or "disabled", or an empty string when the value is empty or unsupported.
+   */
+  std::string parse_app_virtual_display(std::string_view value);
 
   /**
    * @brief Initialize proc functions

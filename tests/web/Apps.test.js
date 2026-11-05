@@ -366,3 +366,46 @@ describe('app gamepad type override', () => {
     expect(ctx.editForm.gamepad).toBe('')
   })
 })
+
+describe('app virtual display override', () => {
+  it('lists the global setting first, then enabled and disabled', () => {
+    const values = Apps.computed.appVirtualDisplayOptions().map(option => option.value)
+
+    expect(values).toEqual(['', 'enabled', 'disabled'])
+  })
+
+  it('labels apps that override the virtual display', () => {
+    const label = Apps.methods.appVirtualDisplayLabel
+
+    expect(label({ 'virtual-display': 'enabled' })).toBe('apps.virtual_display_enabled')
+    expect(label({ 'virtual-display': 'disabled' })).toBe('apps.virtual_display_disabled')
+    expect(label({ 'virtual-display': '' })).toBeNull()
+    expect(label({})).toBeNull()
+    expect(label(null)).toBeNull()
+    expect(label({ 'virtual-display': 'unknown' })).toBeNull()
+  })
+
+  it('starts new apps on the global setting', () => {
+    const ctx = { openEditModal: vi.fn(), editForm: null, editFormError: 'x' }
+
+    Apps.methods.newApp.call(ctx)
+
+    expect(ctx.editForm['virtual-display']).toBe('')
+  })
+
+  it('fills a missing override when editing an existing app', () => {
+    const ctx = { apps: [{ name: 'Game' }], platform: 'windows', openEditModal: vi.fn() }
+
+    Apps.methods.editApp.call(ctx, 0)
+
+    expect(ctx.editForm['virtual-display']).toBe('')
+  })
+
+  it('keeps the enabled choice in the saved form', () => {
+    const ctx = { apps: [{ name: 'Game', 'virtual-display': 'enabled' }], platform: 'windows', openEditModal: vi.fn() }
+
+    Apps.methods.editApp.call(ctx, 0)
+
+    expect(ctx.editForm['virtual-display']).toBe('enabled')
+  })
+})

@@ -70,6 +70,7 @@
               <span v-if="app['exclude-global-prep-cmd']" class="sx-tag">{{ $t('apps.badge_no_global_prep') }}</span>
               <span v-if="app['auto-detach']" class="sx-tag">{{ $t('apps.badge_auto_detach') }}</span>
               <span v-if="appGamepadLabel(app)" class="sx-tag">{{ $t(appGamepadLabel(app)) }}</span>
+              <span v-if="appVirtualDisplayLabel(app)" class="sx-tag">{{ $t(appVirtualDisplayLabel(app)) }}</span>
             </div>
           </div>
         </li>
@@ -304,6 +305,14 @@
                 <option v-for="option in appGamepadOptions" :key="option.value" :value="option.value">{{ $t(option.label) }}</option>
               </select>
               <div id="appGamepadHelp" class="form-text">{{ $t('apps.gamepad_desc') }}</div>
+            </div>
+            <!-- virtual display -->
+            <div class="mb-3" v-if="platform === 'windows'">
+              <label for="appVirtualDisplay" class="form-label">{{ $t('apps.virtual_display') }}</label>
+              <select id="appVirtualDisplay" class="form-select" aria-describedby="appVirtualDisplayHelp" v-model="editForm['virtual-display']">
+                <option v-for="option in appVirtualDisplayOptions" :key="option.value" :value="option.value">{{ $t(option.label) }}</option>
+              </select>
+              <div id="appVirtualDisplayHelp" class="form-text">{{ $t('apps.virtual_display_desc') }}</div>
             </div>
             <!-- output -->
             <div class="mb-3">
@@ -580,6 +589,13 @@
     { value: 'x360', label: 'config.gamepad_x360' },
     { value: 'ds4', label: 'config.gamepad_ds4' },
   ];
+
+  /** Virtual display overrides an application may set, matching proc::parse_app_virtual_display. */
+  const APP_VIRTUAL_DISPLAY_OPTIONS = [
+    { value: '', label: 'apps.virtual_display_global' },
+    { value: 'enabled', label: 'apps.virtual_display_enabled' },
+    { value: 'disabled', label: 'apps.virtual_display_disabled' },
+  ];
   import { Modal } from 'bootstrap/dist/js/bootstrap'
   import {
     ArrowDown,
@@ -756,6 +772,10 @@
       appGamepadOptions() {
         return APP_GAMEPAD_OPTIONS;
       },
+      /** Virtual display overrides an application may request, with the global setting first. */
+      appVirtualDisplayOptions() {
+        return APP_VIRTUAL_DISPLAY_OPTIONS;
+      },
       installedVersionNotStable() {
         if (!this.githubVersion || !this.version) {
           return false;
@@ -853,6 +873,17 @@
         }
         return APP_GAMEPAD_OPTIONS.find(option => option.value === app.gamepad)?.label ?? null;
       },
+      /**
+       * Return the locale key naming an app's virtual display override.
+       * @param {object} app Application entry from apps.json.
+       * @returns {?string} Locale key, or null when the app uses the global setting.
+       */
+      appVirtualDisplayLabel(app) {
+        if (!app?.['virtual-display']) {
+          return null;
+        }
+        return APP_VIRTUAL_DISPLAY_OPTIONS.find(option => option.value === app['virtual-display'])?.label ?? null;
+      },
       newApp() {
         this.editForm = {
           name: "",
@@ -865,6 +896,7 @@
           "wait-all": true,
           "exit-timeout": 5,
           gamepad: "",
+          "virtual-display": "",
           "prep-cmd": [],
           detached: [],
           "image-path": ""
@@ -895,6 +927,9 @@
         }
         if (this.editForm.gamepad === undefined) {
           this.editForm.gamepad = "";
+        }
+        if (this.editForm["virtual-display"] === undefined) {
+          this.editForm["virtual-display"] = "";
         }
         this.editFormError = "";
         this.openEditModal();
