@@ -1,5 +1,6 @@
 ---
 # Lightweight Windows-only build and release for this fork.
+# Static Qt needs its image and font libraries installed explicitly.
 # The upstream CI builds every platform on every push, which GitHub throttles on forks.
 name: Fork Windows Release
 permissions: {}
@@ -57,6 +58,15 @@ jobs:
             mingw-w64-ucrt-x86_64-opus
             mingw-w64-ucrt-x86_64-qt6-static
             mingw-w64-ucrt-x86_64-toolchain
+            mingw-w64-ucrt-x86_64-double-conversion
+            mingw-w64-ucrt-x86_64-freetype
+            mingw-w64-ucrt-x86_64-harfbuzz
+            mingw-w64-ucrt-x86_64-libjpeg-turbo
+            mingw-w64-ucrt-x86_64-libpng
+            mingw-w64-ucrt-x86_64-libtiff
+            mingw-w64-ucrt-x86_64-md4c
+            mingw-w64-ucrt-x86_64-pcre2
+            mingw-w64-ucrt-x86_64-zstd
 
       - name: Setup dotnet  # needed for wix
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73  # v6.1.0
