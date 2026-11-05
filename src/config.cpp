@@ -751,6 +751,7 @@ namespace config {
     true,  // nv_realtime_hags
     true,  // nv_opengl_vulkan_on_dxgi
     true,  // nv_sunshine_high_power_mode
+    false,  // nv_frame_limiter
     {},  // nv_legacy
 
     {
@@ -1644,6 +1645,7 @@ namespace config {
     generic_f(vars, "nvenc_split_encode", video.nv.split_frame_encoding, nv::split_encode_from_view);
     bool_f(vars, "nvenc_realtime_hags", video.nv_realtime_hags);
     bool_f(vars, "nvenc_opengl_vulkan_on_dxgi", video.nv_opengl_vulkan_on_dxgi);
+    bool_f(vars, "nvenc_frame_limiter", video.nv_frame_limiter);
     bool_f(vars, "nvenc_latency_over_power", video.nv_sunshine_high_power_mode);
 
 #if !defined(__ANDROID__) && !defined(__APPLE__)

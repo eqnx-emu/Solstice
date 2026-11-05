@@ -5,6 +5,7 @@
 #pragma once
 
 // standard includes
+#include <cstdint>
 #include <memory>
 
 namespace nvprefs {
@@ -64,7 +65,31 @@ namespace nvprefs {
      */
     bool restore_global_profile();
 
+    /**
+     * @brief Cap every game to the given frame rate through the driver's global frame rate limiter.
+     * @details The previous limiter value is recorded in the undo file so it is restored even if
+     * Sunshine terminates improperly.
+     *
+     * @param fps Frame rate limit to apply.
+     * @return True when the NVIDIA preferences operation succeeds.
+     */
+    bool apply_frame_limiter(uint32_t fps);
+
+    /**
+     * @brief Restore the global frame rate limiter changed by apply_frame_limiter().
+     *
+     * @return True when the NVIDIA preferences operation succeeds or there was nothing to restore.
+     */
+    bool restore_frame_limiter();
+
   private:
+    /**
+     * @brief Create the undo file if needed and write the current undo data to it.
+     *
+     * @return True when the undo file holds the current undo data.
+     */
+    bool write_undo_file();
+
     struct impl;
     std::unique_ptr<impl> pimpl;
   };

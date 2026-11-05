@@ -72,7 +72,10 @@ namespace nlohmann {
      * @param data Payload or state data to serialize, deserialize, or forward.
      */
     static void to_json(json &j, const data_t &data) {
-      j = json {{"opengl_swapchain", data.opengl_swapchain}};
+      j = json {
+        {"opengl_swapchain", data.opengl_swapchain},
+        {"frame_limiter", data.frame_limiter}
+      };
     }
 
     /**
@@ -83,6 +86,10 @@ namespace nlohmann {
      */
     static void from_json(const json &j, data_t &data) {
       j.at("opengl_swapchain").get_to(data.opengl_swapchain);
+      // Undo files written by older versions don't have this key
+      if (j.contains("frame_limiter")) {
+        j.at("frame_limiter").get_to(data.frame_limiter);
+      }
     }
   };
 
@@ -130,6 +137,25 @@ namespace nvprefs {
     return data.opengl_swapchain;
   }
 
+  void undo_data_t::set_frame_limiter(uint32_t our_value, std::optional<uint32_t> undo_value) {
+    data.frame_limiter = data_t::opengl_swapchain_t {
+      our_value,
+      undo_value
+    };
+  }
+
+  std::optional<undo_data_t::data_t::opengl_swapchain_t> undo_data_t::get_frame_limiter() const {
+    return data.frame_limiter;
+  }
+
+  void undo_data_t::clear_frame_limiter() {
+    data.frame_limiter = std::nullopt;
+  }
+
+  bool undo_data_t::empty() const {
+    return !data.opengl_swapchain && !data.frame_limiter;
+  }
+
   std::string undo_data_t::write() const {
     try {
       // Keep this assignment otherwise data will be treated as an array due to
@@ -155,6 +181,11 @@ namespace nvprefs {
     const auto &swapchain_data = newer_data.get_opengl_swapchain();
     if (swapchain_data) {
       set_opengl_swapchain(swapchain_data->our_value, swapchain_data->undo_value);
+    }
+
+    // Keep the oldest limiter undo value, since that one is the user's own setting
+    if (const auto &limiter_data = newer_data.get_frame_limiter(); limiter_data && !data.frame_limiter) {
+      set_frame_limiter(limiter_data->our_value, limiter_data->undo_value);
     }
   }
 

@@ -112,6 +112,15 @@ const config = ref(props.config)
                       default="true"
             ></Checkbox>
 
+            <!-- Limit games to the stream frame rate -->
+            <Checkbox v-if="platform === 'windows'"
+                      class="mb-3"
+                      id="nvenc_frame_limiter"
+                      locale-prefix="config"
+                      v-model="config.nvenc_frame_limiter"
+                      default="false"
+            ></Checkbox>
+
             <!-- NVENC H264 CAVLC -->
             <Checkbox class="mb-3"
                       id="nvenc_h264_cavlc"

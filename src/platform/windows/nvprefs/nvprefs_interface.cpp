@@ -193,6 +193,87 @@ namespace nvprefs {
     return true;
   }
 
+  bool nvprefs_interface::write_undo_file() {
+    if (!pimpl->undo_file) {
+      if (!CreateDirectoryW(pimpl->undo_folder_path.c_str(), nullptr) && GetLastError() != ERROR_ALREADY_EXISTS) {
+        error_message("Couldn't create undo folder");
+        return false;
+      }
+
+      pimpl->undo_file = undo_file_t::create_new_file(pimpl->undo_file_path);
+      if (!pimpl->undo_file) {
+        error_message("Couldn't create undo file");
+        return false;
+      }
+    }
+
+    if (!pimpl->undo_file->write_undo_data(*pimpl->undo_data)) {
+      error_message("Couldn't write to undo file");
+      return false;
+    }
+
+    return true;
+  }
+
+  bool nvprefs_interface::apply_frame_limiter(uint32_t fps) {
+    if (!pimpl->loaded || fps == 0 || fps > FRL_FPS_MAX) {
+      return false;
+    }
+
+    std::optional<uint32_t> previous_value;
+    if (!pimpl->driver_settings.set_base_profile_frame_limiter(fps, previous_value)) {
+      pimpl->driver_settings.load_settings();
+      return false;
+    }
+
+    if (!pimpl->undo_data) {
+      pimpl->undo_data = undo_data_t();
+    }
+    // If a limiter is already recorded (e.g. reconnect), keep the user's original value to restore
+    if (const auto existing = pimpl->undo_data->get_frame_limiter()) {
+      previous_value = existing->undo_value;
+    }
+    pimpl->undo_data->set_frame_limiter(fps, previous_value);
+
+    // Persist the undo record before committing the driver change
+    if (!write_undo_file() || !pimpl->driver_settings.save_settings()) {
+      error_message("Couldn't apply frame rate limiter");
+      pimpl->undo_data->clear_frame_limiter();
+      pimpl->driver_settings.load_settings();
+      return false;
+    }
+
+    info_message("Applied frame rate limiter: " + std::to_string(fps) + " FPS");
+    return true;
+  }
+
+  bool nvprefs_interface::restore_frame_limiter() {
+    if (!pimpl->undo_data || !pimpl->undo_data->get_frame_limiter()) {
+      return true;
+    }
+    if (!pimpl->loaded) {
+      return false;
+    }
+
+    if (!pimpl->driver_settings.restore_base_profile_frame_limiter(*pimpl->undo_data->get_frame_limiter()) || !pimpl->driver_settings.save_settings()) {
+      error_message("Couldn't restore frame rate limiter");
+      return false;
+    }
+
+    pimpl->undo_data->clear_frame_limiter();
+    if (pimpl->undo_data->empty()) {
+      if (pimpl->undo_file && !pimpl->undo_file->delete_file()) {
+        error_message("Couldn't delete undo file");
+      }
+      pimpl->undo_data = std::nullopt;
+      pimpl->undo_file = std::nullopt;
+    } else if (pimpl->undo_file) {
+      pimpl->undo_file->write_undo_data(*pimpl->undo_data);
+    }
+
+    return true;
+  }
+
   bool nvprefs_interface::owning_undo_file() const {
     return pimpl->undo_file.has_value();
   }

@@ -94,6 +94,24 @@ namespace nvprefs {
      */
     bool check_and_modify_application_profile(bool &modified);
 
+    /**
+     * @brief Set the global (base profile) frame rate limiter.
+     *
+     * @param value Frame rate limiter value to apply.
+     * @param previous_value Receives the value that was set before, or nothing when the setting was absent.
+     * @return True when the NVIDIA driver-settings operation succeeds.
+     */
+    bool set_base_profile_frame_limiter(uint32_t value, std::optional<uint32_t> &previous_value);
+
+    /**
+     * @brief Restore the global (base profile) frame rate limiter from an undo record.
+     * @details Nothing is changed if the limiter was modified externally after Sunshine set it.
+     *
+     * @param record Value applied by Sunshine and the value to restore.
+     * @return True when the NVIDIA driver-settings operation succeeds.
+     */
+    bool restore_base_profile_frame_limiter(const undo_data_t::data_t::opengl_swapchain_t &record);
+
   private:
     NvDRSSessionHandle session_handle = nullptr;
   };

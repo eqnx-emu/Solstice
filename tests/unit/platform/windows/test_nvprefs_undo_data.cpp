@@ -66,4 +66,78 @@ TEST(NvPrefsUndoDataTest, PreservesZeroAndAbsentRestoreValues) {
   }
 }
 
+/**
+ * @brief The frame rate limiter record survives serialization, including an absent restore value.
+ */
+TEST(NvPrefsUndoDataTest, FrameLimiterRoundTripsThroughSerialization) {
+  for (const auto value : {std::optional<std::uint32_t> {}, std::optional<std::uint32_t> {0}, std::optional<std::uint32_t> {144}}) {
+    nvprefs::undo_data_t original;
+    original.set_frame_limiter(60, value);
+    const auto serialized = original.write();
+    nvprefs::undo_data_t restored;
+    restored.read(std::vector<char> {serialized.begin(), serialized.end()});
+    const auto limiter = restored.get_frame_limiter();
+    ASSERT_TRUE(limiter.has_value());
+    EXPECT_EQ(limiter->our_value, 60);
+    EXPECT_EQ(limiter->undo_value, value);
+    EXPECT_FALSE(restored.get_opengl_swapchain().has_value());
+  }
+}
+
+/**
+ * @brief Undo files written before the limiter existed still load.
+ */
+TEST(NvPrefsUndoDataTest, ReadsUndoFilesWithoutFrameLimiter) {
+  const std::string legacy = R"({"opengl_swapchain":{"our_value":1,"undo_value":null}})";
+  nvprefs::undo_data_t restored;
+  restored.read(std::vector<char> {legacy.begin(), legacy.end()});
+  ASSERT_TRUE(restored.get_opengl_swapchain().has_value());
+  EXPECT_FALSE(restored.get_frame_limiter().has_value());
+  EXPECT_FALSE(restored.empty());
+}
+
+/**
+ * @brief Clearing the limiter leaves other records, and empty() reports when nothing is left.
+ */
+TEST(NvPrefsUndoDataTest, ClearFrameLimiterAndEmpty) {
+  nvprefs::undo_data_t data;
+  EXPECT_TRUE(data.empty());
+
+  data.set_frame_limiter(60, std::nullopt);
+  EXPECT_FALSE(data.empty());
+  data.clear_frame_limiter();
+  EXPECT_FALSE(data.get_frame_limiter().has_value());
+  EXPECT_TRUE(data.empty());
+
+  data.set_opengl_swapchain(1, 0);
+  data.set_frame_limiter(60, 30);
+  data.clear_frame_limiter();
+  EXPECT_FALSE(data.empty());
+  EXPECT_TRUE(data.get_opengl_swapchain().has_value());
+}
+
+/**
+ * @brief Merging keeps the first recorded limiter restore value (the user's own setting).
+ */
+TEST(NvPrefsUndoDataTest, MergeKeepsOriginalFrameLimiterUndoValue) {
+  nvprefs::undo_data_t current;
+  current.set_frame_limiter(60, 144);
+
+  nvprefs::undo_data_t newer;
+  newer.set_frame_limiter(120, 60);
+  newer.set_opengl_swapchain(1, 0);
+  current.merge(newer);
+
+  const auto limiter = current.get_frame_limiter();
+  ASSERT_TRUE(limiter.has_value());
+  EXPECT_EQ(limiter->our_value, 60);
+  EXPECT_EQ(limiter->undo_value, 144);
+  EXPECT_TRUE(current.get_opengl_swapchain().has_value());
+
+  nvprefs::undo_data_t empty;
+  empty.merge(newer);
+  ASSERT_TRUE(empty.get_frame_limiter().has_value());
+  EXPECT_EQ(empty.get_frame_limiter()->undo_value, 60);
+}
+
 #endif
