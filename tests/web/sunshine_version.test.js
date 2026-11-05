@@ -55,8 +55,8 @@ describe('SunshineVersion', () => {
     expect(() => version.isGreater(2)).toThrow(TypeError)
   })
 
-  it('checks this fork for releases', () => {
-    expect(RELEASES_API_URL).toBe('https://api.github.com/repos/luizfbalves/Sunshine/releases')
+  it('checks Solstice for releases', () => {
+    expect(RELEASES_API_URL).toBe('https://api.github.com/repos/luizfbalves/Solstice/releases')
   })
 
   it('builds versions only from tagged releases', () => {
