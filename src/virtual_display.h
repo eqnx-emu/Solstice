@@ -47,6 +47,8 @@ namespace virtual_display {
    *
    * @param session The launch session. Its `enable_hdr` is cleared when the virtual display is used.
    * @param app_value The app's "virtual-display" value.
+   * An active virtual display that the session no longer wants is torn down as in `end()` before returning `false`.
+   *
    * @return `true` when the virtual display is used and the display was configured;
    *         `false` when the caller should configure the physical display as usual.
    */
@@ -55,7 +57,8 @@ namespace virtual_display {
   /**
    * @brief Stop using the virtual display.
    *
-   * Reverts the display configuration, removes the virtual display and restores the original
+   * Reverts the display configuration immediately (falling back to the scheduled revert when that fails),
+   * then removes the virtual display and restores the original
    * `config::video.output_name`. Does nothing when no virtual display is active.
    */
   void end();

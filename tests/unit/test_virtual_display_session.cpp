@@ -9,6 +9,8 @@
 
 // standard includes
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -157,8 +159,11 @@ namespace {
 
     [[nodiscard]] RevertResult revertSettings() override {
       log->add("revert");
-      std::ignore = persistence->clear();
-      return RevertResult::Ok;
+      const auto result {revert_result.load()};
+      if (result == RevertResult::Ok) {
+        std::ignore = persistence->clear();
+      }
+      return result;
     }
 
     [[nodiscard]] bool resetPersistence() override {
@@ -174,6 +179,8 @@ namespace {
       std::lock_guard lock {mutex};
       return applied;
     }
+
+    std::atomic<RevertResult> revert_result {RevertResult::Ok};  ///< Result returned by `revertSettings`.
 
   private:
     std::shared_ptr<call_log_t> log;  ///< Shared call log.
@@ -407,6 +414,65 @@ TEST_F(VirtualDisplay, EndRevertsBeforeRemoving) {
   EXPECT_LT(revert, remove);
   ASSERT_EQ(backend->removed.size(), 1);
   EXPECT_EQ(backend->removed[0], expected_guid("switch-1"));
+}
+
+TEST_F(VirtualDisplay, EndRevertsImmediatelyDespiteRevertDelay) {
+  display_device::test_set_config_revert_delay(std::chrono::seconds {10});
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, ""));
+
+  virtual_display::end();
+
+  // With a 10 s revert delay only an immediate revert can have run by the time end() returns.
+  const auto calls {log->snapshot()};
+  const auto revert {std::ranges::find(calls, "revert")};
+  const auto remove {std::ranges::find(calls, "remove")};
+  ASSERT_NE(revert, calls.end());
+  ASSERT_NE(remove, calls.end());
+  EXPECT_LT(revert, remove);
+  EXPECT_FALSE(display_device::test_revert_retry_is_scheduled());
+}
+
+TEST_F(VirtualDisplay, EndSchedulesRevertRetryWhenImmediateRevertFails) {
+  display_device::test_set_config_revert_delay(std::chrono::seconds {10});
+  settings->revert_result = display_device::SettingsManagerInterface::RevertResult::SwitchingTopologyFailed;
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, ""));
+
+  virtual_display::end();
+
+  const auto calls {log->snapshot()};
+  EXPECT_EQ(std::ranges::count(calls, "revert"), 1);
+  EXPECT_LT(std::ranges::find(calls, "revert"), std::ranges::find(calls, "remove"));
+  EXPECT_TRUE(display_device::test_revert_retry_is_scheduled());
+  EXPECT_FALSE(virtual_display::active());
+  EXPECT_EQ(config::video.output_name, physical_device_id);
+}
+
+TEST_F(VirtualDisplay, BeginEndsActiveDisplayWhenNoLongerWanted) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, ""));
+
+  config::video.virtual_display = virtual_display_e::disabled;
+  auto resumed {make_session(1280, 720, 60)};
+  EXPECT_FALSE(virtual_display::begin(*resumed, ""));
+
+  EXPECT_FALSE(virtual_display::active());
+  EXPECT_EQ(config::video.output_name, physical_device_id);
+  EXPECT_EQ(backend->removed.size(), 1);
+  EXPECT_TRUE(resumed->enable_hdr);
+}
+
+TEST_F(VirtualDisplay, BeginRestoresClientSopsFlag) {
+  auto session {make_session(1280, 720, 60)};
+  session->enable_sops = false;
+
+  ASSERT_TRUE(virtual_display::begin(*session, ""));
+
+  EXPECT_FALSE(session->enable_sops);
+  const auto applied {settings->applied_configs()};
+  ASSERT_EQ(applied.size(), 1);
+  EXPECT_EQ(applied[0].m_resolution, (display_device::Resolution {1280, 720}));
 }
 
 TEST_F(VirtualDisplay, EndRestoresOriginalOutputName) {

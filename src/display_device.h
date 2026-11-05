@@ -131,6 +131,23 @@ namespace display_device {
   void revert_configuration();
 
   /**
+   * @brief Revert the display configuration right now, in the calling thread, ignoring the configured revert delay.
+   *
+   * Any scheduled configuration or revert retries are stopped first. Nothing is scheduled afterwards,
+   * so call `revert_configuration()` when this fails to keep retrying in the background.
+   *
+   * @return True when the previous state was fully restored (or the platform is unsupported),
+   *         false when the revert failed or settings for an unavailable display are still pending.
+   *
+   * @examples
+   * if (!revert_configuration_now()) {
+   *   revert_configuration();
+   * }
+   * @examples_end
+   */
+  [[nodiscard]] bool revert_configuration_now();
+
+  /**
    * @brief Reset persisted display state and the captured initial state.
    *
    * This is normally used to get out of the "broken" state where the algorithm wants
@@ -216,13 +233,19 @@ namespace display_device {
   void test_set_retry_interval(std::chrono::milliseconds interval);
 
   /**
+   * @brief Override the delay before the first scheduled revert attempt (normally `dd.config_revert_delay`).
+   * @param delay Delay before the first attempt. Zero runs the first attempt immediately.
+   */
+  void test_set_config_revert_delay(std::chrono::milliseconds delay);
+
+  /**
    * @brief Report whether another revert attempt is still scheduled.
    * @return True when the revert scheduler will run again.
    */
   [[nodiscard]] bool test_revert_retry_is_scheduled();
 
   /**
-   * @brief Stop the revert scheduler and drop the test settings manager.
+   * @brief Stop the revert scheduler, drop the test settings manager and clear the test delay overrides.
    */
   void test_reset_display_device();
 #endif

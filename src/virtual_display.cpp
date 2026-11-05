@@ -15,6 +15,7 @@
 #include "display_device.h"
 #include "logging.h"
 #include "rtsp.h"
+#include "utility.h"
 #include "virtual_display.h"
 
 #ifdef _WIN32
@@ -116,9 +117,36 @@ namespace virtual_display {
       video_config.dd.refresh_rate_option = config::video_t::dd_t::refresh_rate_option_e::automatic;
 
       // The virtual display is ours, so apply the requested mode even without "Optimize game settings".
-      const bool enable_sops {std::exchange(session.enable_sops, true)};
+      const auto restore_sops {util::fail_guard([&session, enable_sops = std::exchange(session.enable_sops, true)]() {
+        session.enable_sops = enable_sops;
+      })};
       display_device::configure_display(video_config, session);
-      session.enable_sops = enable_sops;
+    }
+
+    /**
+     * @brief Tear down the active virtual display.
+     *
+     * Reverts the display configuration immediately while the virtual display still exists, falling back to the
+     * scheduled revert when that fails, then removes the display and restores `config::video.output_name`.
+     *
+     * @note Must be called with `STATE.mutex` held. Does nothing when no virtual display is active.
+     */
+    void end_unlocked() {
+      if (!STATE.active) {
+        return;
+      }
+
+      // Revert while the virtual display still exists, so the physical primary display can be restored.
+      if (!display_device::revert_configuration_now()) {
+        BOOST_LOG(warning) << "Immediate display configuration revert failed, retrying in the background."sv;
+        display_device::revert_configuration();
+      }
+      if (STATE.backend && !STATE.backend->remove(STATE.guid)) {
+        BOOST_LOG(warning) << "Failed to remove the virtual display."sv;
+      }
+      config::video.output_name = std::move(STATE.original_output_name);
+      STATE.original_output_name.clear();
+      STATE.active = false;
     }
   }  // namespace
 
@@ -153,6 +181,8 @@ namespace virtual_display {
   bool begin(rtsp_stream::launch_session_t &session, std::string_view app_value) {
     std::lock_guard lock {STATE.mutex};
     if (!should_use(config::video.virtual_display, app_value)) {
+      // A display left over from a session that wanted one must not be targeted by the physical display path.
+      end_unlocked();
       return false;
     }
 
@@ -197,18 +227,7 @@ namespace virtual_display {
 
   void end() {
     std::lock_guard lock {STATE.mutex};
-    if (!STATE.active) {
-      return;
-    }
-
-    // Revert while the virtual display still exists, so the physical primary display can be restored.
-    display_device::revert_configuration();
-    if (STATE.backend && !STATE.backend->remove(STATE.guid)) {
-      BOOST_LOG(warning) << "Failed to remove the virtual display."sv;
-    }
-    config::video.output_name = std::move(STATE.original_output_name);
-    STATE.original_output_name.clear();
-    STATE.active = false;
+    end_unlocked();
   }
 
   bool active() {

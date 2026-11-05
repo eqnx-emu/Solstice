@@ -1105,6 +1105,26 @@ namespace display_device {
     revert_configuration_unlocked(revert_option_e::try_indefinitely_with_delay);
   }
 
+  bool revert_configuration_now() {
+    std::lock_guard lock {DD_DATA.mutex};
+    if (!DD_DATA.sm_instance) {
+      // Platform is not supported, nothing to do.
+      return true;
+    }
+
+    const auto persistence_watch {DD_DATA.persistence_watch};
+    return DD_DATA.sm_instance->execute([&persistence_watch](auto &settings_iface, auto &stop_token) {
+      // Stop pending configuration or revert retries so they do not run after this revert.
+      stop_token.requestStop();
+      const auto result {settings_iface.revertSettings()};
+      if (result != SettingsManagerInterface::RevertResult::Ok) {
+        BOOST_LOG(warning) << "Immediate display device configuration revert failed with result: " << static_cast<int>(result);
+        return false;
+      }
+      return !(persistence_watch && persistence_watch->has_pending_restores());
+    });
+  }
+
   bool reset_persistence() {
     std::lock_guard lock {DD_DATA.mutex};
     if (!DD_DATA.sm_instance) {
@@ -1230,6 +1250,11 @@ namespace display_device {
     DD_DATA.test_retry_interval = interval;
   }
 
+  void test_set_config_revert_delay(const std::chrono::milliseconds delay) {
+    std::lock_guard lock {DD_DATA.mutex};
+    DD_DATA.config_revert_delay = delay;
+  }
+
   bool test_revert_retry_is_scheduled() {
     std::lock_guard lock {DD_DATA.mutex};
     return DD_DATA.sm_instance && DD_DATA.sm_instance->isScheduled();
@@ -1243,6 +1268,7 @@ namespace display_device {
     DD_DATA.sm_instance.reset();
     DD_DATA.persistence_watch.reset();
     DD_DATA.test_retry_interval.reset();
+    DD_DATA.config_revert_delay = std::chrono::milliseconds::zero();
   }
 #endif
 }  // namespace display_device

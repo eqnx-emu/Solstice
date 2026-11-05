@@ -726,6 +726,38 @@ TEST(DisplayDeviceRevert, RedockRestoresPendingSettings) {
   EXPECT_TRUE(wait_until_revert_stops());
 }
 
+TEST(DisplayDeviceRevert, ImmediateRevertRunsDespiteRevertDelay) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+  display_device::test_set_config_revert_delay(10s);
+  const auto persistence {display_device::test_make_watched_persistence()};
+  auto manager {std::make_unique<redock_settings_manager_t>(persistence)};
+  manager->set_keep_pending(false);
+  auto *manager_ptr {manager.get()};
+  display_device::test_install_settings_manager(std::move(manager), persistence);
+
+  EXPECT_TRUE(display_device::revert_configuration_now());
+  EXPECT_EQ(manager_ptr->progress().revert_calls, 1);
+  EXPECT_FALSE(display_device::test_revert_retry_is_scheduled());
+}
+
+TEST(DisplayDeviceRevert, ImmediateRevertReportsPendingRestores) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+  const auto persistence {display_device::test_make_watched_persistence()};
+  auto manager {std::make_unique<redock_settings_manager_t>(persistence)};
+  auto *manager_ptr {manager.get()};
+  display_device::test_install_settings_manager(std::move(manager), persistence);
+
+  EXPECT_FALSE(display_device::revert_configuration_now());
+  EXPECT_EQ(manager_ptr->progress().revert_calls, 1);
+  EXPECT_TRUE(manager_ptr->progress().pending_saved);
+}
+
+TEST(DisplayDeviceRevert, ImmediateRevertSucceedsWhenPlatformIsUnsupported) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+
+  EXPECT_TRUE(display_device::revert_configuration_now());
+}
+
 TEST(DisplayDeviceMapDisplayName, ReturnsDeviceIdOfGdiName) {
   [[maybe_unused]] const display_device_revert_guard_t guard;
   const auto persistence {display_device::test_make_watched_persistence()};
