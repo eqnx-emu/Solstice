@@ -55,13 +55,13 @@ namespace platf::vdisplay {
    * @param driver The protocol version reported by the driver.
    * @return True when the major versions match and the driver minor is not older than ours.
    */
+  bool is_protocol_compatible(const SUDOVDA::SUVDA_PROTOCAL_VERSION &driver);
+
   /**
    * @brief Get the sleep schedule between retries when opening the driver or looking up a new display name.
    * @return Sleep durations in milliseconds, applied after each failed attempt (the attempt count is size() + 1).
    */
   std::vector<unsigned long> backoff_schedule_ms();
-
-  bool is_protocol_compatible(const SUDOVDA::SUVDA_PROTOCAL_VERSION &driver);
 
   /**
    * @brief SudoVDA backed virtual display implementation.
