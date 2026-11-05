@@ -33,30 +33,35 @@
     </div>
 
     <!-- Apps list -->
-    <section class="sx-panel" v-if="displayedApps.length > 0" :aria-label="$t('apps.applications_title')">
-      <ul class="sx-rows">
-        <li class="sx-row sx-app-row" v-for="{ app, index } in displayedApps" :key="index">
-          <div class="sx-app-cover" aria-hidden="true">
-            <img v-if="app['image-path']" :src="'/api/covers/' + index" class="app-poster" alt="" @error="handleImageError" />
-            <span v-else class="app-initial">{{ app.name.charAt(0).toUpperCase() }}</span>
-          </div>
-          <div class="sx-row-main">
-            <p class="fw-semibold">{{ app.name }}</p>
-            <p class="sx-app-cmd" v-if="app.cmd" :title="app.cmd">{{ app.cmd }}</p>
-            <p class="sx-app-cmd" v-else-if="app.detached && app.detached.length" :title="app.detached[0]">{{ app.detached[0] }}</p>
-          </div>
-          <div class="d-flex flex-wrap gap-1">
-            <span v-if="app.elevated" class="sx-tag">{{ $t('apps.badge_admin') }}</span>
-            <span v-if="app.detached && app.detached.length" class="sx-tag">{{ $t('apps.badge_detached') }}</span>
-            <span v-if="app['prep-cmd'] && app['prep-cmd'].length" class="sx-tag">{{ $t('apps.badge_app_prep') }}</span>
-            <span v-if="app['exclude-global-prep-cmd']" class="sx-tag">{{ $t('apps.badge_no_global_prep') }}</span>
-            <span v-if="app['auto-detach']" class="sx-tag">{{ $t('apps.badge_auto_detach') }}</span>
-          </div>
-          <div class="d-flex gap-2">
-            <button class="btn btn-sx" @click="editApp(index)">{{ $t('apps.edit') }}</button>
-            <button class="btn btn-sx-danger" @click="showDeleteModal(index)" :aria-label="$t('apps.delete') + ': ' + app.name">
+    <section v-if="displayedApps.length > 0" :aria-label="$t('apps.applications_title')">
+      <ul class="sx-app-grid">
+        <li class="sx-app-tile" v-for="{ app, index } in displayedApps" :key="index">
+          <button type="button" class="sx-app-poster" @click="editApp(index)"
+                  :aria-label="$t('apps.edit') + ': ' + app.name">
+            <img v-if="app['image-path']" :src="'/api/covers/' + index" alt="" @error="handleImageError" />
+            <span class="sx-app-poster-initial" aria-hidden="true">{{ app.name.charAt(0).toUpperCase() }}</span>
+          </button>
+          <div class="sx-app-tile-actions">
+            <button type="button" class="sx-app-tile-btn" @click="editApp(index)"
+                    :aria-label="$t('apps.edit') + ': ' + app.name" :title="$t('apps.edit')">
+              <pencil :size="16" class="icon"></pencil>
+            </button>
+            <button type="button" class="sx-app-tile-btn sx-app-tile-btn-danger" @click="showDeleteModal(index)"
+                    :aria-label="$t('apps.delete') + ': ' + app.name" :title="$t('apps.delete')">
               <trash-2 :size="16" class="icon"></trash-2>
             </button>
+          </div>
+          <div class="sx-app-tile-body">
+            <p class="sx-app-tile-name" :title="app.name">{{ app.name }}</p>
+            <p class="sx-app-cmd" v-if="app.cmd" :title="app.cmd">{{ app.cmd }}</p>
+            <p class="sx-app-cmd" v-else-if="app.detached && app.detached.length" :title="app.detached[0]">{{ app.detached[0] }}</p>
+            <div class="sx-app-tile-tags">
+              <span v-if="app.elevated" class="sx-tag">{{ $t('apps.badge_admin') }}</span>
+              <span v-if="app.detached && app.detached.length" class="sx-tag">{{ $t('apps.badge_detached') }}</span>
+              <span v-if="app['prep-cmd'] && app['prep-cmd'].length" class="sx-tag">{{ $t('apps.badge_app_prep') }}</span>
+              <span v-if="app['exclude-global-prep-cmd']" class="sx-tag">{{ $t('apps.badge_no_global_prep') }}</span>
+              <span v-if="app['auto-detach']" class="sx-tag">{{ $t('apps.badge_auto_detach') }}</span>
+            </div>
           </div>
         </li>
       </ul>
@@ -561,6 +566,7 @@
     FolderOpen,
     FolderUp,
     HardDrive,
+    Pencil,
     Play,
     Plus,
     RotateCcw,
@@ -642,6 +648,7 @@
       FolderOpen,
       FolderUp,
       HardDrive,
+      Pencil,
       Play,
       Plus,
       RotateCcw,
