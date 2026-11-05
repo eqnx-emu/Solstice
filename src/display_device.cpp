@@ -1037,6 +1037,20 @@ namespace display_device {
     return mapped_name;
   }
 
+  std::string map_display_name(const std::string &display_name) {
+    std::lock_guard lock {DD_DATA.mutex};
+    if (!DD_DATA.sm_instance) {
+      // Fallback to giving back the display name if the platform is not supported.
+      return display_name;
+    }
+
+    const auto devices {DD_DATA.sm_instance->execute([](auto &settings_iface) {
+      return settings_iface.enumAvailableDevices();
+    })};
+    const auto device {std::ranges::find(devices, display_name, &EnumeratedDevice::m_display_name)};
+    return device == std::end(devices) ? std::string {} : device->m_device_id;
+  }
+
   void configure_display(const config::video_t &video_config, const rtsp_stream::launch_session_t &session) {
     const auto result {parse_configuration(video_config, session)};
     if (const auto *parsed_config {std::get_if<SingleDisplayConfiguration>(&result)}; parsed_config) {

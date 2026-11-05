@@ -54,6 +54,18 @@ namespace display_device {
   [[nodiscard]] std::string map_output_name(const std::string &output_name);
 
   /**
+   * @brief Map a platform display name (e.g. a Windows GDI display name) to its device id.
+   * @param display_name The platform display name.
+   * @returns The device id, an empty string if no available device has that name,
+   *          or the display name itself if the platform is not supported.
+   *
+   * @examples
+   * const auto device_id { map_display_name(gdi_display_name) };
+   * @examples_end
+   */
+  [[nodiscard]] std::string map_display_name(const std::string &display_name);
+
+  /**
    * @brief Ask the platform to wake displays before detection or capture.
    * @param display_name Platform capture selector.
    * @param timeout Maximum time to wait for platform-specific wake detection.

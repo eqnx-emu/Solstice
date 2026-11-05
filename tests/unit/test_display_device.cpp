@@ -725,3 +725,24 @@ TEST(DisplayDeviceRevert, RedockRestoresPendingSettings) {
   EXPECT_GE(manager_ptr->progress().revert_calls, 2);
   EXPECT_TRUE(wait_until_revert_stops());
 }
+
+TEST(DisplayDeviceMapDisplayName, ReturnsDeviceIdOfGdiName) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+  const auto persistence {display_device::test_make_watched_persistence()};
+  auto manager {std::make_unique<redock_settings_manager_t>(persistence)};
+  manager->set_devices({
+    {.m_device_id = "panel", .m_display_name = R"(\.\DISPLAY1)", .m_friendly_name = "Panel"},
+    {.m_device_id = "{virtual}", .m_display_name = R"(\.\DISPLAY9)", .m_friendly_name = "Solstice"},
+  });
+  display_device::test_install_settings_manager(std::move(manager), persistence);
+
+  EXPECT_EQ(display_device::map_display_name(R"(\.\DISPLAY9)"), "{virtual}");
+  EXPECT_EQ(display_device::map_display_name(R"(\.\DISPLAY1)"), "panel");
+  EXPECT_EQ(display_device::map_display_name(R"(\.\DISPLAY5)"), "");
+}
+
+TEST(DisplayDeviceMapDisplayName, ReturnsInputWhenPlatformIsUnsupported) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+
+  EXPECT_EQ(display_device::map_display_name(R"(\.\DISPLAY9)"), R"(\.\DISPLAY9)");
+}
