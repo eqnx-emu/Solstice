@@ -10,7 +10,7 @@ vi.mock('../../src_assets/common/assets/web/ResourceCard.vue', () => ({
 
 import Home from '../../src_assets/common/assets/web/Home.vue'
 
-async function mountHome(platform, { developmentVersion = true, licensed = true, serviceAvailable = true, gamepadDriver = 'virtualhid', permissions = [] } = {}) {
+async function mountHome(platform, { developmentVersion = true, licensed = true, serviceAvailable = true, gamepadDriver = 'virtualhid', permissions = [], releasesMissing = false } = {}) {
   vi.stubGlobal('fetch', vi.fn(async url => {
     if (url === './api/config') {
       return { json: async () => ({ platform, controller: 'enabled', gamepad_driver: gamepadDriver, version: '2026.927.1200' }) }
@@ -32,11 +32,11 @@ async function mountHome(platform, { developmentVersion = true, licensed = true,
     if (url === './api/logs') {
       return { text: async () => '' }
     }
-    if (url === 'https://api.github.com/repos/LizardByte/Sunshine/releases/latest') {
-      return { json: async () => ({ tag_name: 'v2026.927.1200' }) }
+    if (url === 'https://api.github.com/repos/luizfbalves/Sunshine/releases/latest') {
+      return { json: async () => (releasesMissing ? { message: 'Not Found' } : { tag_name: 'v2026.927.1200' }) }
     }
-    if (url === 'https://api.github.com/repos/LizardByte/Sunshine/releases') {
-      return { json: async () => [{ tag_name: 'v2026.927.1200', prerelease: true }] }
+    if (url === 'https://api.github.com/repos/luizfbalves/Sunshine/releases') {
+      return { json: async () => (releasesMissing ? [] : [{ tag_name: 'v2026.927.1200', prerelease: true }]) }
     }
     throw new Error(`Unexpected fetch: ${url}`)
   }))
@@ -111,6 +111,17 @@ describe('development broker home notice', () => {
     const wrapper = await mountHome('macos', { gamepadDriver: 'none' })
 
     expect(wrapper.find('.alert.my-4').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('still loads broker status when the fork has no releases yet', async () => {
+    const wrapper = await mountHome('windows', { releasesMissing: true })
+
+    expect(fetch).toHaveBeenCalledWith('https://api.github.com/repos/luizfbalves/Sunshine/releases/latest')
+    expect(fetch).toHaveBeenCalledWith('./api/virtual-input/status')
+    expect(wrapper.vm.githubVersion).toBeNull()
+    expect(wrapper.vm.preReleaseVersion).toBeNull()
+    expect(wrapper.vm.availableRelease).toBeNull()
     wrapper.unmount()
   })
 })

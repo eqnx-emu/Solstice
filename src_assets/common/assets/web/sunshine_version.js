@@ -73,4 +73,35 @@ class SunshineVersion {
   }
 }
 
+/**
+ * @brief GitHub API endpoint listing the releases this build checks for updates.
+ */
+export const RELEASES_API_URL = 'https://api.github.com/repos/luizfbalves/Sunshine/releases';
+
+/**
+ * @brief Build a version from GitHub release data, ignoring missing or malformed releases.
+ *
+ * @param {?object} release GitHub release data, or an API error response.
+ * @return {?SunshineVersion} The parsed version, or null when the data has no release tag.
+ */
+export function versionFromRelease(release) {
+  if (!release || typeof release.tag_name !== 'string') {
+    return null;
+  }
+  return new SunshineVersion(release, null);
+}
+
+/**
+ * @brief Find the newest pre-release in a GitHub release listing.
+ *
+ * @param {*} releases GitHub release listing, or an API error response.
+ * @return {?SunshineVersion} The newest pre-release version, or null when none is listed.
+ */
+export function preReleaseFromList(releases) {
+  if (!Array.isArray(releases)) {
+    return null;
+  }
+  return versionFromRelease(releases.find(release => release?.prerelease));
+}
+
 export default SunshineVersion;

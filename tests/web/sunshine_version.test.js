@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import SunshineVersion from '../../src_assets/common/assets/web/sunshine_version.js'
+import SunshineVersion, {
+  RELEASES_API_URL,
+  preReleaseFromList,
+  versionFromRelease,
+} from '../../src_assets/common/assets/web/sunshine_version.js'
 
 describe('SunshineVersion', () => {
   it('parses release metadata', () => {
@@ -49,5 +53,29 @@ describe('SunshineVersion', () => {
     expect(version.parseVersion(null)).toBeNull()
     expect(unparsedVersion.isGreater('1.0.0')).toBe(false)
     expect(() => version.isGreater(2)).toThrow(TypeError)
+  })
+
+  it('checks this fork for releases', () => {
+    expect(RELEASES_API_URL).toBe('https://api.github.com/repos/luizfbalves/Sunshine/releases')
+  })
+
+  it('builds versions only from tagged releases', () => {
+    expect(versionFromRelease({ tag_name: 'v2026.1105.120000' }).versionParts).toEqual([2026, 1105, 120000])
+    expect(versionFromRelease({ message: 'Not Found' })).toBeNull()
+    expect(versionFromRelease(null)).toBeNull()
+    expect(versionFromRelease(undefined)).toBeNull()
+  })
+
+  it('finds the newest pre-release in a release listing', () => {
+    const releases = [
+      { tag_name: 'v2026.1105.120000', prerelease: false },
+      null,
+      { tag_name: 'v2026.1104.120000', prerelease: true },
+    ]
+
+    expect(preReleaseFromList(releases).version).toBe('v2026.1104.120000')
+    expect(preReleaseFromList([{ tag_name: 'v1.0.0', prerelease: false }])).toBeNull()
+    expect(preReleaseFromList([])).toBeNull()
+    expect(preReleaseFromList({ message: 'Not Found' })).toBeNull()
   })
 })

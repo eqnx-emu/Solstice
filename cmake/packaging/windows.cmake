@@ -9,6 +9,20 @@ if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64" AND DEFINED _MINHOOK_DLL)
     install(FILES "${_MINHOOK_DLL}" DESTINATION "." COMPONENT application)
 endif()
 
+# Optional: bundle libVIIPER.dll so gamepad_driver = viiper works from the installer
+set(SUNSHINE_VIIPER_DLL "" CACHE FILEPATH "Path to libVIIPER.dll to bundle with the Windows package")
+if(SUNSHINE_VIIPER_DLL)
+    if(NOT EXISTS "${SUNSHINE_VIIPER_DLL}")
+        message(FATAL_ERROR "SUNSHINE_VIIPER_DLL does not exist: ${SUNSHINE_VIIPER_DLL}")
+    endif()
+    install(FILES "${SUNSHINE_VIIPER_DLL}" DESTINATION "." COMPONENT application)
+    get_filename_component(_viiper_dir "${SUNSHINE_VIIPER_DLL}" DIRECTORY)
+    if(EXISTS "${_viiper_dir}/licenses.txt")
+        install(FILES "${_viiper_dir}/licenses.txt" DESTINATION "." RENAME "libVIIPER-licenses.txt"
+                COMPONENT application)
+    endif()
+endif()
+
 # Adding tools
 install(TARGETS dxgi-info RUNTIME DESTINATION "tools" COMPONENT dxgi)
 install(TARGETS audio-info RUNTIME DESTINATION "tools" COMPONENT audio)

@@ -561,7 +561,7 @@
   import Navbar from './Navbar.vue'
   import Checkbox from './Checkbox.vue'
   import { apiFetch } from './fetch_utils'
-  import SunshineVersion from './sunshine_version'
+  import SunshineVersion, { RELEASES_API_URL, versionFromRelease } from './sunshine_version'
   import { Modal } from 'bootstrap/dist/js/bootstrap'
   import {
     ArrowDown,
@@ -814,9 +814,9 @@
           this.version = new SunshineVersion(null, r.version);
         });
 
-      fetch("https://api.github.com/repos/LizardByte/Sunshine/releases/latest")
+      fetch(`${RELEASES_API_URL}/latest`)
         .then((r) => r.json())
-        .then((r) => this.githubVersion = new SunshineVersion(r, null))
+        .then((r) => this.githubVersion = versionFromRelease(r))
         .catch((e) => console.error(e));
     },
     methods: {

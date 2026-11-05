@@ -1,0 +1,147 @@
+---
+# Lightweight Windows-only build and release for this fork.
+# The upstream CI builds every platform on every push, which GitHub throttles on forks.
+name: Fork Windows Release
+permissions: {}
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.14'
+  VIIPER_VERSION: 'v0.9.0'
+  VIIPER_SHA256: '341180d887a6d04f2b42a5d10c7743a9c84125272d99dfe5cf76a2a15ca1167c'
+
+jobs:
+  windows:
+    name: Windows-AMD64
+    if: github.repository_owner != 'LizardByte'
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          submodules: recursive
+
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e  # v2.33.0
+        with:
+          msystem: ucrt64
+          update: true
+          install: >-
+            git
+            unzip
+            mingw-w64-ucrt-x86_64-boost
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-cppwinrt
+            mingw-w64-ucrt-x86_64-curl-winssl
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-MinHook
+            mingw-w64-ucrt-x86_64-miniupnpc
+            mingw-w64-ucrt-x86_64-nlohmann-json
+            mingw-w64-ucrt-x86_64-nsis
+            mingw-w64-ucrt-x86_64-onevpl
+            mingw-w64-ucrt-x86_64-openssl
+            mingw-w64-ucrt-x86_64-opus
+            mingw-w64-ucrt-x86_64-qt6-static
+            mingw-w64-ucrt-x86_64-toolchain
+
+      - name: Setup dotnet  # needed for wix
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73  # v6.1.0
+        with:
+          dotnet-version: '10.x'
+
+      - name: Setup NodeJS
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: 'lts/*'
+
+      - name: Setup python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Download libVIIPER
+        run: |
+          set -euo pipefail
+          curl -fsSL -o viiper.zip \
+            "https://github.com/Alia5/VIIPER/releases/download/${VIIPER_VERSION}/viiper-libVIIPER-windows-amd64.zip"
+          echo "${VIIPER_SHA256}  viiper.zip" | sha256sum -c -
+          mkdir -p viiper
+          unzip -o viiper.zip -d viiper
+          dll="$(find "$PWD/viiper" -name libVIIPER.dll | head -n1)"
+          test -n "${dll}"
+          echo "VIIPER_DLL=$(cygpath -m "${dll}")" >> "$GITHUB_ENV"
+
+      - name: Version
+        run: |
+          version="$(date -u +%Y).$(date -u +%-m%d).$(date -u +%H%M%S)"
+          echo "BUILD_VERSION=${version}" >> "$GITHUB_ENV"
+          echo "Building ${version}"
+
+      - name: Build
+        env:
+          BRANCH: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+          MSYS2_PATH_TYPE: inherit
+        run: |
+          set -euo pipefail
+          cmake \
+            -B build \
+            -G Ninja \
+            -S . \
+            -DBUILD_DOCS=OFF \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DSUNSHINE_ASSETS_DIR=assets \
+            -DSUNSHINE_PUBLISHER_NAME="${GITHUB_REPOSITORY_OWNER}" \
+            -DSUNSHINE_PUBLISHER_WEBSITE="https://github.com/${GITHUB_REPOSITORY}" \
+            -DSUNSHINE_PUBLISHER_ISSUE_URL="https://github.com/${GITHUB_REPOSITORY}/issues" \
+            -DSUNSHINE_VIIPER_DLL="${VIIPER_DLL}"
+          ninja -C build
+
+      - name: Test
+        working-directory: build/tests
+        run: ./test_sunshine.exe --gtest_color=yes --gtest_filter=-SystemTrayTest.*
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          cd build
+          cpack -G WIX
+          cpack -G ZIP
+          mv ./cpack_artifacts/Sunshine.msi "../artifacts/Sunshine-${BUILD_VERSION}-Windows-AMD64-installer.msi"
+          mv ./cpack_artifacts/Sunshine.zip "../artifacts/Sunshine-${BUILD_VERSION}-Windows-AMD64-portable.zip"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: sunshine-windows-amd64
+          path: artifacts/
+          if-no-files-found: error
+
+      - name: Publish release
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create "v${BUILD_VERSION}" artifacts/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "Sunshine ${BUILD_VERSION} (fork)" \
+            --notes "Windows build of ${GITHUB_SHA} with libVIIPER ${VIIPER_VERSION} bundled." \
+            --latest

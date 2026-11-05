@@ -149,7 +149,7 @@
   import { marked } from 'marked'
   import Navbar from './Navbar.vue'
   import ResourceCard from './ResourceCard.vue'
-  import SunshineVersion from './sunshine_version'
+  import SunshineVersion, { RELEASES_API_URL, preReleaseFromList, versionFromRelease } from './sunshine_version'
   import { apiFetch } from './fetch_utils'
   import {
     AlertCircle,
@@ -222,10 +222,14 @@
           console.error('Failed to fetch permission status:', e);
         }
         console.log("Version: ", this.version.version)
-        this.githubVersion = new SunshineVersion(await fetch("https://api.github.com/repos/LizardByte/Sunshine/releases/latest").then((r) => r.json()), null);
-        console.log("GitHub Version: ", this.githubVersion.version)
-        this.preReleaseVersion = new SunshineVersion((await fetch("https://api.github.com/repos/LizardByte/Sunshine/releases").then((r) => r.json())).find(release => release.prerelease), null);
-        console.log("Pre-Release Version: ", this.preReleaseVersion.version)
+        try {
+          this.githubVersion = versionFromRelease(await fetch(`${RELEASES_API_URL}/latest`).then((r) => r.json()));
+          console.log("GitHub Version: ", this.githubVersion?.version)
+          this.preReleaseVersion = preReleaseFromList(await fetch(RELEASES_API_URL).then((r) => r.json()));
+          console.log("Pre-Release Version: ", this.preReleaseVersion?.version)
+        } catch (e) {
+          console.error("Failed to check for Sunshine updates:", e);
+        }
 
         // Read the broker version on both platforms to identify development builds.
         if (this.platform === 'windows' || this.platform === 'macos') {
