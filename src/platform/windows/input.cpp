@@ -34,6 +34,7 @@
 #include "src/logging.h"
 #include "src/platform/common.h"
 #include "src/platform/virtualhid_input.h"
+#include "src/process_gamepad.h"
 #include "viiper_gamepad.h"
 
 namespace platf {
@@ -673,7 +674,13 @@ namespace platf {
       return 0;
     }
 
-    if (viiper::should_emulate_ns2pro(config::input.gamepad_driver, config::input.gamepad, metadata.type)) {
+    const auto app_gamepad = proc::running_app_gamepad();
+    const std::string_view gamepad = app_gamepad.empty() ? std::string_view {config::input.gamepad} : std::string_view {app_gamepad};
+    if (!app_gamepad.empty()) {
+      BOOST_LOG(info) << "Gamepad "sv << id.globalIndex << " uses the running app's gamepad type: "sv << gamepad;
+    }
+
+    if (viiper::should_emulate_ns2pro(config::input.gamepad_driver, gamepad, metadata.type)) {
       if (!raw->viiper) {
         raw->viiper = std::make_unique<viiper::context_t>();
       }
@@ -693,10 +700,10 @@ namespace platf {
 
     VIGEM_TARGET_TYPE selectedGamepadType;
 
-    if (config::input.gamepad == "x360"sv) {
+    if (gamepad == "x360"sv) {
       BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be Xbox 360 controller (manual selection)"sv;
       selectedGamepadType = Xbox360Wired;
-    } else if (config::input.gamepad == "ds4"sv) {
+    } else if (gamepad == "ds4"sv) {
       BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be DualShock 4 controller (manual selection)"sv;
       selectedGamepadType = DualShock4Wired;
     } else if (metadata.type == LI_CTYPE_PS) {

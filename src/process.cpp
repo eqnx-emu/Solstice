@@ -33,6 +33,7 @@
 #include "logging.h"
 #include "platform/common.h"
 #include "process.h"
+#include "process_gamepad.h"
 #include "system_tray.h"
 #include "utility.h"
 
@@ -444,6 +445,28 @@ namespace proc {
     return _app.name;
   }
 
+  std::string proc_t::get_running_app_gamepad() const {
+    if (_app_id <= 0 && !placebo) {
+      return {};
+    }
+    return _app.gamepad;
+  }
+
+  std::string running_app_gamepad() {
+    return proc.get_running_app_gamepad();
+  }
+
+  std::string parse_app_gamepad(std::string_view value) {
+    if (value.empty()) {
+      return {};
+    }
+    if (value == "auto"sv || value == "switch"sv || value == "x360"sv || value == "ds4"sv) {
+      return std::string {value};
+    }
+    BOOST_LOG(warning) << "Ignoring unsupported app gamepad type: "sv << value;
+    return {};
+  }
+
   void proc_t::update_apps_and_env(proc_t &&other) {
     if (_app_id > 0 || placebo) {
       // Preserve session-specific environment variables for the running app
@@ -761,6 +784,7 @@ namespace proc {
         auto auto_detach = app_node.get_optional<bool>("auto-detach"s);
         auto wait_all = app_node.get_optional<bool>("wait-all"s);
         auto exit_timeout = app_node.get_optional<int>("exit-timeout"s);
+        auto gamepad = app_node.get_optional<std::string>("gamepad"s);
 
         std::vector<proc::cmd_t> prep_cmds;
         if (!exclude_global_prep.value_or(false)) {
@@ -830,6 +854,7 @@ namespace proc {
         ctx.auto_detach = auto_detach.value_or(true);
         ctx.wait_all = wait_all.value_or(true);
         ctx.exit_timeout = std::chrono::seconds {exit_timeout.value_or(5)};
+        ctx.gamepad = parse_app_gamepad(gamepad.value_or(""));
 
         auto possible_ids = calculate_app_id(name, ctx.image_path, i++);
         if (ids.count(std::get<0>(possible_ids)) == 0) {

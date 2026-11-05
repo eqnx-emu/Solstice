@@ -69,6 +69,7 @@
               <span v-if="app['prep-cmd'] && app['prep-cmd'].length" class="sx-tag">{{ $t('apps.badge_app_prep') }}</span>
               <span v-if="app['exclude-global-prep-cmd']" class="sx-tag">{{ $t('apps.badge_no_global_prep') }}</span>
               <span v-if="app['auto-detach']" class="sx-tag">{{ $t('apps.badge_auto_detach') }}</span>
+              <span v-if="appGamepadLabel(app)" class="sx-tag">{{ $t(appGamepadLabel(app)) }}</span>
             </div>
           </div>
         </li>
@@ -295,6 +296,14 @@
               <input type="number" class="form-control monospace" id="exitTimeout" aria-describedby="exitTimeoutHelp"
                      v-model="editForm['exit-timeout']" min="0" placeholder="5" />
               <div id="exitTimeoutHelp" class="form-text">{{ $t('apps.exit_timeout_desc') }}</div>
+            </div>
+            <!-- gamepad type -->
+            <div class="mb-3" v-if="platform === 'windows'">
+              <label for="appGamepad" class="form-label">{{ $t('apps.gamepad') }}</label>
+              <select id="appGamepad" class="form-select" aria-describedby="appGamepadHelp" v-model="editForm.gamepad">
+                <option v-for="option in appGamepadOptions" :key="option.value" :value="option.value">{{ $t(option.label) }}</option>
+              </select>
+              <div id="appGamepadHelp" class="form-text">{{ $t('apps.gamepad_desc') }}</div>
             </div>
             <!-- output -->
             <div class="mb-3">
@@ -562,6 +571,15 @@
   import Checkbox from './Checkbox.vue'
   import { apiFetch } from './fetch_utils'
   import SunshineVersion, { RELEASES_API_URL, versionFromRelease } from './sunshine_version'
+
+  /** Gamepad type overrides an application may set, matching proc::parse_app_gamepad. */
+  const APP_GAMEPAD_OPTIONS = [
+    { value: '', label: 'apps.gamepad_global' },
+    { value: 'auto', label: 'apps.gamepad_auto' },
+    { value: 'switch', label: 'config.gamepad_switch' },
+    { value: 'x360', label: 'config.gamepad_x360' },
+    { value: 'ds4', label: 'config.gamepad_ds4' },
+  ];
   import { Modal } from 'bootstrap/dist/js/bootstrap'
   import {
     ArrowDown,
@@ -734,6 +752,10 @@
       };
     },
     computed: {
+      /** Gamepad types an application may request, with the global setting first. */
+      appGamepadOptions() {
+        return APP_GAMEPAD_OPTIONS;
+      },
       installedVersionNotStable() {
         if (!this.githubVersion || !this.version) {
           return false;
@@ -820,6 +842,17 @@
         .catch((e) => console.error(e));
     },
     methods: {
+      /**
+       * Return the locale key naming an app's gamepad type override.
+       * @param {object} app Application entry from apps.json.
+       * @returns {?string} Locale key, or null when the app uses the global setting.
+       */
+      appGamepadLabel(app) {
+        if (!app?.gamepad) {
+          return null;
+        }
+        return APP_GAMEPAD_OPTIONS.find(option => option.value === app.gamepad)?.label ?? null;
+      },
       newApp() {
         this.editForm = {
           name: "",
@@ -831,6 +864,7 @@
           "auto-detach": true,
           "wait-all": true,
           "exit-timeout": 5,
+          gamepad: "",
           "prep-cmd": [],
           detached: [],
           "image-path": ""
@@ -858,6 +892,9 @@
         }
         if (this.editForm["exit-timeout"] === undefined) {
           this.editForm["exit-timeout"] = 5;
+        }
+        if (this.editForm.gamepad === undefined) {
+          this.editForm.gamepad = "";
         }
         this.editFormError = "";
         this.openEditModal();

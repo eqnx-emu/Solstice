@@ -79,6 +79,7 @@ namespace proc {
     bool auto_detach;  ///< Whether the process should detach automatically.
     bool wait_all;  ///< Whether Sunshine waits for all child processes.
     std::chrono::seconds exit_timeout;  ///< Exit timeout.
+    std::string gamepad;  ///< Gamepad type for this app, or empty to use the global setting.
   };
 
   /**
@@ -144,6 +145,12 @@ namespace proc {
      * @return Name of the most recently launched application.
      */
     std::string get_last_run_app_name();
+    /**
+     * @brief Get the gamepad type override of the running application.
+     *
+     * @return The running app's gamepad type, or an empty string when no app runs or it has no override.
+     */
+    std::string get_running_app_gamepad() const;
     /**
      * @brief Terminate the launched application process.
      */
@@ -227,6 +234,14 @@ namespace proc {
    * @return Parsed value or parse status.
    */
   std::optional<proc::proc_t> parse(const std::string &file_name);
+
+  /**
+   * @brief Normalize an application's gamepad type override.
+   *
+   * @param value Raw "gamepad" value from apps.json.
+   * @return The override, or an empty string when the value is empty or unsupported.
+   */
+  std::string parse_app_gamepad(std::string_view value);
 
   /**
    * @brief Initialize proc functions
