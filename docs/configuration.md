@@ -352,7 +352,7 @@ consent prompt for directory ACLs, so the Web UI shows setup steps for correctin
             @endcode</td>
     </tr>
     <tr>
-        <td rowspan="4">Choices</td>
+        <td rowspan="5">Choices</td>
         <td>all</td>
         <td>Windows only: prefer Virtual HID Broker when it is available and licensed, with ViGEmBus as a limited fallback.</td>
     </tr>
@@ -363,6 +363,14 @@ consent prompt for directory ACLs, so the Web UI shows setup steps for correctin
     <tr>
         <td>vigembus</td>
         <td>Windows only: use ViGEmBus for gamepads and hide Virtual HID Broker status and licensing details.</td>
+    </tr>
+    <tr>
+        <td>viiper</td>
+        <td>Windows only: emulate a Nintendo Switch 2 Pro Controller through libVIIPER over USBIP when the gamepad type is
+            `switch`, or `auto` with a Nintendo client controller. Other types use ViGEmBus. Requires the signed
+            [usbip-win2](https://github.com/vadimgrn/usbip-win2) driver and `libVIIPER.dll` from
+            [VIIPER](https://github.com/Alia5/VIIPER) next to `sunshine.exe`. The USBIP server listens on
+            `127.0.0.1:3241` only.</td>
     </tr>
     <tr>
         <td>none</td>

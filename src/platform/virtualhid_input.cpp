@@ -668,7 +668,7 @@ namespace platf::virtualhid {
     const std::string_view gamepad_driver,
     const bool virtualhid_licensed
   ) {
-    return gamepad_driver != config::GAMEPAD_DRIVER_VIGEMBUS && gamepad_driver != config::GAMEPAD_DRIVER_NONE && capabilities.supports_gamepad &&
+    return gamepad_driver != config::GAMEPAD_DRIVER_VIGEMBUS && gamepad_driver != config::GAMEPAD_DRIVER_VIIPER && gamepad_driver != config::GAMEPAD_DRIVER_NONE && capabilities.supports_gamepad &&
            (!capabilities.requires_installed_driver || virtualhid_licensed);
   }
 
