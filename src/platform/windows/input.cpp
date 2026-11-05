@@ -34,6 +34,7 @@
 #include "src/logging.h"
 #include "src/platform/common.h"
 #include "src/platform/virtualhid_input.h"
+#include "viiper_gamepad.h"
 
 namespace platf {
   using namespace std::literals;
@@ -522,6 +523,7 @@ namespace platf {
   struct input_raw_t {
     virtualhid::input_context_t virtualhid;  ///< libvirtualhid input context.
     std::unique_ptr<vigem_t> vigem;  ///< ViGEm fallback context.
+    std::unique_ptr<viiper::context_t> viiper;  ///< libVIIPER Switch 2 Pro context, created on first use.
   };
 
   /**
@@ -671,6 +673,16 @@ namespace platf {
       return 0;
     }
 
+    if (viiper::should_emulate_ns2pro(config::input.gamepad_driver, config::input.gamepad, metadata.type)) {
+      if (!raw->viiper) {
+        raw->viiper = std::make_unique<viiper::context_t>();
+      }
+      if (raw->viiper->alloc_gamepad(id, feedback_queue) == 0) {
+        return 0;
+      }
+      BOOST_LOG(warning) << "Switch controller emulation through libVIIPER failed; falling back to ViGEmBus"sv;
+    }
+
     if (!should_allocate_vigembus_gamepad(use_virtualhid)) {
       return -1;
     }
@@ -733,6 +745,10 @@ namespace platf {
       return virtualhid::rebind_gamepad(raw->virtualhid, id, std::move(feedback_queue));
     }
 
+    if (raw->viiper && raw->viiper->has_gamepad(id.globalIndex)) {
+      return raw->viiper->rebind_gamepad(id, std::move(feedback_queue));
+    }
+
     if (!raw->vigem) {
       return -1;
     }
@@ -745,6 +761,11 @@ namespace platf {
 
     if (virtualhid::has_gamepad(raw->virtualhid, nr)) {
       virtualhid::free_gamepad(raw->virtualhid, nr);
+      return;
+    }
+
+    if (raw->viiper && raw->viiper->has_gamepad(nr)) {
+      raw->viiper->free_gamepad(nr);
       return;
     }
 
@@ -1011,6 +1032,11 @@ namespace platf {
       return;
     }
 
+    if (raw->viiper && raw->viiper->has_gamepad(nr)) {
+      raw->viiper->update(nr, gamepad_state);
+      return;
+    }
+
     auto *vigem = raw->vigem.get();
 
     // If there is no gamepad support
@@ -1223,6 +1249,11 @@ namespace platf {
       return;
     }
 
+    if (raw->viiper && raw->viiper->has_gamepad(motion.id.globalIndex)) {
+      raw->viiper->motion(motion);
+      return;
+    }
+
     auto *vigem = raw->vigem.get();
 
     // If there is no gamepad support
@@ -1296,6 +1327,12 @@ namespace platf {
 
     if (config::input.gamepad_driver == config::GAMEPAD_DRIVER_VIGEMBUS) {
       gps = vigembus_supported_gamepads(raw->vigem != nullptr);
+      return gps;
+    }
+
+    if (config::input.gamepad_driver == config::GAMEPAD_DRIVER_VIIPER) {
+      gps = vigembus_supported_gamepads(raw->vigem != nullptr);
+      gps.push_back({"switch", true, ""});
       return gps;
     }
 

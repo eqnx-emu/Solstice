@@ -312,7 +312,7 @@
           });
         }
 
-        if (this.gamepadDriver === 'vigembus') {
+        if (this.gamepadDriver === 'vigembus' || this.gamepadDriver === 'viiper') {
           return this.buildVigembusNotice(vigembusUsable);
         }
 

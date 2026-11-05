@@ -239,6 +239,24 @@ TEST_F(ConfigPersistenceTest, ParsesNvencFrameLimiterOption) {
   EXPECT_FALSE(config::video.nv_frame_limiter);
 }
 
+#ifdef _WIN32
+/**
+ * @brief Verify the VIIPER driver policy accepts Switch emulation and rejects profiles it cannot serve.
+ */
+TEST_F(ConfigPersistenceTest, ParsesViiperGamepadDriver) {
+  const auto apps_file = config_file().parent_path() / "sunshine_test_config_apps.json";
+  ASSERT_EQ(file_handler::write_file(apps_file.string().c_str(), "{}"), 0);
+  config::stream.file_apps = apps_file.string();
+
+  config::apply_config_for_test("gamepad_driver = viiper\ngamepad = switch\n");
+  EXPECT_EQ(config::input.gamepad_driver, config::GAMEPAD_DRIVER_VIIPER);
+  EXPECT_EQ(config::input.gamepad, "switch");
+
+  config::apply_config_for_test("gamepad_driver = viiper\ngamepad = ds5\n");
+  EXPECT_EQ(config::input.gamepad, "auto");
+}
+#endif
+
 /**
  * @brief Verify mixed-case boolean values update configuration correctly.
  */
