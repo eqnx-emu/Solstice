@@ -2022,20 +2022,6 @@ p {
     min-width: 0;
 }
 
-.config-actions {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-    margin-top: var(--spacing-lg);
-    padding-top: var(--spacing-lg);
-    border-top: 1px solid var(--color-border);
-}
-
-.config-actions .btn {
-    width: 100%;
-    justify-content: center;
-}
-
 .config-page {
     padding: var(--spacing-xl);
     background-color: var(--color-surface);
@@ -3446,8 +3432,9 @@ a:hover {
     gap: 0.75rem 1.25rem;
     padding: 0.75rem 1rem;
     background-color: var(--color-surface);
-    border: 1px solid var(--color-text-base);
+    border: 1px solid var(--color-border-strong);
     border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
 }
 
 .sx-sticky-bar p {
@@ -3455,6 +3442,13 @@ a:hover {
     margin: 0;
     font-size: 0.875rem;
     color: var(--color-text-base);
+}
+
+@media (max-width: 576px) {
+    .sx-sticky-bar .btn {
+        flex: 1 1 100%;
+        justify-content: center;
+    }
 }
 
 .sx-dashed {
@@ -3512,9 +3506,31 @@ a:hover {
     object-fit: cover;
 }
 
+.sx-app-row {
+    transition: background-color var(--transition-base);
+}
+
+.sx-app-row:first-child {
+    border-top: 0;
+}
+
+.sx-app-row:hover {
+    background-color: var(--color-bg-subtle);
+}
+
+.sx-app-row:first-child:hover {
+    border-top-left-radius: var(--radius-md);
+    border-top-right-radius: var(--radius-md);
+}
+
+.sx-app-row:last-child:hover {
+    border-bottom-left-radius: var(--radius-md);
+    border-bottom-right-radius: var(--radius-md);
+}
+
 .sx-app-cmd {
     font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, monospace;
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     color: var(--color-text-muted);
     overflow: hidden;
     text-overflow: ellipsis;

@@ -128,7 +128,7 @@
         </div>
       </div>
 
-      <div class="sx-sticky-bar mt-4 config-actions">
+      <div class="sx-sticky-bar mt-4">
         <p>
           <strong v-if="dirty">{{ $t('config.unsaved_changes') }}</strong>
           <strong v-else-if="saved && !restarted">{{ $t('config.saved_not_applied') }}</strong>

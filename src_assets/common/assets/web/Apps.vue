@@ -35,7 +35,7 @@
     <!-- Apps list -->
     <section class="sx-panel" v-if="displayedApps.length > 0" :aria-label="$t('apps.applications_title')">
       <ul class="sx-rows">
-        <li class="sx-row app-card" v-for="{ app, index } in displayedApps" :key="index">
+        <li class="sx-row sx-app-row" v-for="{ app, index } in displayedApps" :key="index">
           <div class="sx-app-cover" aria-hidden="true">
             <img v-if="app['image-path']" :src="'/api/covers/' + index" class="app-poster" alt="" @error="handleImageError" />
             <span v-else class="app-initial">{{ app.name.charAt(0).toUpperCase() }}</span>
@@ -46,11 +46,11 @@
             <p class="sx-app-cmd" v-else-if="app.detached && app.detached.length" :title="app.detached[0]">{{ app.detached[0] }}</p>
           </div>
           <div class="d-flex flex-wrap gap-1">
-            <span v-if="app.elevated" class="sx-tag app-flag-badge">{{ $t('apps.badge_admin') }}</span>
-            <span v-if="app.detached && app.detached.length" class="sx-tag app-flag-badge">{{ $t('apps.badge_detached') }}</span>
-            <span v-if="app['prep-cmd'] && app['prep-cmd'].length" class="sx-tag app-flag-badge">{{ $t('apps.badge_app_prep') }}</span>
-            <span v-if="app['exclude-global-prep-cmd']" class="sx-tag app-flag-badge">{{ $t('apps.badge_no_global_prep') }}</span>
-            <span v-if="app['auto-detach']" class="sx-tag app-flag-badge">{{ $t('apps.badge_auto_detach') }}</span>
+            <span v-if="app.elevated" class="sx-tag">{{ $t('apps.badge_admin') }}</span>
+            <span v-if="app.detached && app.detached.length" class="sx-tag">{{ $t('apps.badge_detached') }}</span>
+            <span v-if="app['prep-cmd'] && app['prep-cmd'].length" class="sx-tag">{{ $t('apps.badge_app_prep') }}</span>
+            <span v-if="app['exclude-global-prep-cmd']" class="sx-tag">{{ $t('apps.badge_no_global_prep') }}</span>
+            <span v-if="app['auto-detach']" class="sx-tag">{{ $t('apps.badge_auto_detach') }}</span>
           </div>
           <div class="d-flex gap-2">
             <button class="btn btn-sx" @click="editApp(index)">{{ $t('apps.edit') }}</button>
