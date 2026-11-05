@@ -58,4 +58,9 @@ TEST(ProtocolCompat, ChecksMajorAndMinor) {
   EXPECT_FALSE(is_protocol_compatible({0, 1, 9, false}));
   EXPECT_FALSE(is_protocol_compatible({1, 2, 1, false}));
 }
+
+TEST(BackoffSchedule, DoublesFrom20To320Milliseconds) {
+  const std::vector<unsigned long> expected {20, 40, 80, 160, 320};
+  EXPECT_EQ(platf::vdisplay::backoff_schedule_ms(), expected);
+}
 #endif

@@ -77,6 +77,10 @@ namespace platf::vdisplay {
     return guid;
   }
 
+  std::vector<unsigned long> backoff_schedule_ms() {
+    return {20, 40, 80, 160, 320};
+  }
+
   bool is_protocol_compatible(const SUDOVDA::SUVDA_PROTOCAL_VERSION &driver) {
     return SUDOVDA::isProtocolCompatible(driver);
   }
@@ -110,17 +114,18 @@ namespace platf::vdisplay {
     }
 
     HANDLE handle = INVALID_HANDLE_VALUE;
-    for (DWORD retry_interval = 20;; retry_interval *= 2) {
+    const auto backoff = backoff_schedule_ms();
+    for (size_t attempt = 0;; ++attempt) {
       handle = SUDOVDA::OpenDevice(&SUDOVDA::SUVDA_INTERFACE_GUID);
       if (handle != INVALID_HANDLE_VALUE) {
         break;
       }
-      if (retry_interval >= 320) {
+      if (attempt >= backoff.size()) {
         BOOST_LOG(warning) << "SudoVDA: failed to open the virtual display driver"sv;
         status_ = driver_status_e::failed;
         return status_;
       }
-      Sleep(retry_interval);
+      Sleep(backoff[attempt]);
     }
 
     if (!SUDOVDA::CheckProtocolCompatible(handle)) {
@@ -206,16 +211,17 @@ namespace platf::vdisplay {
     }
 
     wchar_t device_name[CCHDEVICENAME] {};
-    for (DWORD retry_interval = 20;; retry_interval *= 2) {
+    const auto backoff = backoff_schedule_ms();
+    for (size_t attempt = 0;; ++attempt) {
       if (SUDOVDA::GetAddedDisplayName(output, device_name)) {
         break;
       }
-      if (retry_interval >= 320) {
+      if (attempt >= backoff.size()) {
         BOOST_LOG(warning) << "SudoVDA: cannot get the name of the new virtual display, removing it"sv;
         remove(guid);
         return std::nullopt;
       }
-      Sleep(retry_interval);
+      Sleep(backoff[attempt]);
     }
 
     auto name = utf_utils::to_utf8(device_name);
