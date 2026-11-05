@@ -19,3 +19,12 @@ Motion Picture Experts Group (MPEG-LA) and/or any other necessary licensing requ
 In summary, while Sunshine is free to use, it is the user's responsibility to ensure compliance with all applicable
 licensing requirements when redistributing the software as part of a commercial offering. If you have any questions or
 concerns about using Sunshine in a commercial setting, we recommend consulting with a lawyer.
+
+## Third-Party Notices
+
+### SudoVDA
+
+The virtual display backend uses the SudoVDA driver interface headers (`third-party/sudovda`), created by
+[SudoMaker](https://github.com/SudoMaker/SudoVDA) and taken from the
+[Apollo](https://github.com/ClassicOldSong/Apollo) project (GPL-3.0). The backend in
+`src/platform/windows/virtual_display.cpp` is adapted from Apollo's SudoVDA integration.
