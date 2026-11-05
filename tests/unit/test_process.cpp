@@ -28,6 +28,7 @@
 
 // local includes
 #include <src/process.h>
+#include <src/process_gamepad.h>
 #include <src/utility.h>
 
 namespace fs = std::filesystem;
@@ -841,4 +842,62 @@ TEST_F(ProcessRefreshTest, FileTimeType_DefaultValueComparison) {
   // The actual correctness is verified by Refresh_ParsesFileOnFirstCall above —
   // if that test passes, the optional fix works regardless of platform behavior.
   SUCCEED();
+}
+
+TEST(ProcessTest, ParsesAppGamepadOverride) {
+  EXPECT_EQ(proc::parse_app_gamepad(""), "");
+  EXPECT_EQ(proc::parse_app_gamepad("auto"), "auto");
+  EXPECT_EQ(proc::parse_app_gamepad("switch"), "switch");
+  EXPECT_EQ(proc::parse_app_gamepad("x360"), "x360");
+  EXPECT_EQ(proc::parse_app_gamepad("ds4"), "ds4");
+  EXPECT_EQ(proc::parse_app_gamepad("xone"), "");
+}
+
+TEST_F(ProcessRefreshTest, Parse_ReadsAppGamepadOverride) {
+  const fs::path apps_file = test_dir / "apps_gamepad.json";
+  {
+    std::ofstream file(apps_file);
+    file << R"({ "env": {}, "apps": [
+      { "name": "SwitchGame", "gamepad": "switch" },
+      { "name": "DefaultGame" },
+      { "name": "BadGame", "gamepad": "bogus" }
+    ] })";
+  }
+
+  auto parsed = proc::parse(apps_file.string());
+
+  ASSERT_TRUE(parsed.has_value());
+  const auto &apps = parsed->get_apps();
+  ASSERT_EQ(apps.size(), 3u);
+  EXPECT_EQ(apps[0].gamepad, "switch");
+  EXPECT_EQ(apps[1].gamepad, "");
+  EXPECT_EQ(apps[2].gamepad, "");
+}
+
+TEST_F(ProcessRefreshTest, RunningAppGamepadFollowsTheLaunchedApp) {
+  boost::process::v1::environment env = boost::this_process::environment();
+  std::vector<proc::ctx_t> apps;
+  proc::ctx_t ctx;
+  ctx.name = "SwitchGame";
+  ctx.id = "77";
+  ctx.gamepad = "switch";
+  apps.push_back(std::move(ctx));
+  proc::proc_t target(std::move(env), std::move(apps));
+
+  EXPECT_EQ(target.get_running_app_gamepad(), "");
+
+  auto launch_session = std::make_shared<rtsp_stream::launch_session_t>();
+  launch_session->width = 1920;
+  launch_session->height = 1080;
+  launch_session->fps = 60;
+  launch_session->surround_info = 2;
+  ASSERT_EQ(target.execute(77, launch_session), 0);
+  EXPECT_EQ(target.get_running_app_gamepad(), "switch");
+
+  target.terminate();
+  EXPECT_EQ(target.get_running_app_gamepad(), "");
+}
+
+TEST_F(ProcessUpdateTest, GlobalRunningAppGamepadReadsTheGlobalProcess) {
+  EXPECT_EQ(proc::running_app_gamepad(), "");
 }

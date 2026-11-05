@@ -1199,6 +1199,10 @@ namespace confighttp {
         input_tree.erase("detached");
       }
 
+      if (input_tree.contains("gamepad") && input_tree["gamepad"].is_string() && input_tree["gamepad"].get<std::string>().empty()) {
+        input_tree.erase("gamepad");
+      }
+
       auto &apps_node = file_tree["apps"];
       int index = input_tree["index"].get<int>();  // this will intentionally cause an exception if the provided value is the wrong type
 

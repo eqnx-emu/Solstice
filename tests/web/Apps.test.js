@@ -331,3 +331,38 @@ describe('fetchMissingCovers', () => {
     expect(ctx.coverFetch.summary).toContain('"found":1')
   })
 })
+
+describe('app gamepad type override', () => {
+  it('lists the global setting first and every supported type', () => {
+    const values = Apps.computed.appGamepadOptions().map(option => option.value)
+
+    expect(values).toEqual(['', 'auto', 'switch', 'x360', 'ds4'])
+  })
+
+  it('labels apps that override the gamepad type', () => {
+    const label = Apps.methods.appGamepadLabel
+
+    expect(label({ gamepad: 'switch' })).toBe('config.gamepad_switch')
+    expect(label({ gamepad: 'x360' })).toBe('config.gamepad_x360')
+    expect(label({ gamepad: '' })).toBeNull()
+    expect(label({})).toBeNull()
+    expect(label(null)).toBeNull()
+    expect(label({ gamepad: 'unknown' })).toBeNull()
+  })
+
+  it('starts new apps on the global setting', () => {
+    const ctx = { openEditModal: vi.fn(), editForm: null, editFormError: 'x' }
+
+    Apps.methods.newApp.call(ctx)
+
+    expect(ctx.editForm.gamepad).toBe('')
+  })
+
+  it('fills a missing override when editing an existing app', () => {
+    const ctx = { apps: [{ name: 'Game' }], platform: 'windows', openEditModal: vi.fn() }
+
+    Apps.methods.editApp.call(ctx, 0)
+
+    expect(ctx.editForm.gamepad).toBe('')
+  })
+})
