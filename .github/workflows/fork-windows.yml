@@ -133,7 +133,6 @@ jobs:
           if-no-files-found: error
 
       - name: Publish release
-        if: github.event_name == 'push'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
