@@ -88,6 +88,7 @@ namespace config {
     bool nv_realtime_hags;  ///< Enable the NVIDIA realtime HAGS workaround.
     bool nv_opengl_vulkan_on_dxgi;  ///< Prefer NVIDIA OpenGL/Vulkan-on-DXGI interop.
     bool nv_sunshine_high_power_mode;  ///< Request NVIDIA high-power mode for Sunshine.
+    bool nv_frame_limiter;  ///< Cap games to the stream frame rate with the NVIDIA driver limiter while streaming.
 
     struct {
       std::string preset;  ///< FFmpeg NVENC preset name shared by supported FFmpeg versions.

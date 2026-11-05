@@ -63,6 +63,10 @@ TEST(ConfigDefaultsTest, UsesAutomaticGamepadSelection) {
   EXPECT_EQ(config::input.gamepad, "auto");
 }
 
+TEST(ConfigDefaultsTest, LeavesNvidiaFrameLimiterOff) {
+  EXPECT_FALSE(config::video.nv_frame_limiter);
+}
+
 TEST(ConfigDefaultsTest, TreatsFp16SdrCapturesAsLinear) {
   EXPECT_FALSE(config::video.fp16_sdr_gamma_encoded);
 }
@@ -218,6 +222,21 @@ TEST_F(ConfigPersistenceTest, ParsesFp16SdrGammaEncodedOption) {
 
   config::apply_config_for_test("fp16_sdr_gamma_encoded = disabled\n");
   EXPECT_FALSE(config::video.fp16_sdr_gamma_encoded);
+}
+
+/**
+ * @brief Verify the NVIDIA frame limiter option is off by default and can be toggled.
+ */
+TEST_F(ConfigPersistenceTest, ParsesNvencFrameLimiterOption) {
+  const auto apps_file = config_file().parent_path() / "sunshine_test_config_apps.json";
+  ASSERT_EQ(file_handler::write_file(apps_file.string().c_str(), "{}"), 0);
+  config::stream.file_apps = apps_file.string();
+
+  config::apply_config_for_test("nvenc_frame_limiter = enabled\n");
+  EXPECT_TRUE(config::video.nv_frame_limiter);
+
+  config::apply_config_for_test("nvenc_frame_limiter = disabled\n");
+  EXPECT_FALSE(config::video.nv_frame_limiter);
 }
 
 /**

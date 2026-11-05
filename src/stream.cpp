@@ -2337,6 +2337,12 @@ namespace stream {
         }
 
         platf::streaming_will_stop();
+#ifdef _WIN32
+        if (nvprefs_instance.load()) {
+          nvprefs_instance.restore_frame_limiter();
+          nvprefs_instance.unload();
+        }
+#endif
       }
 
       BOOST_LOG(debug) << "Session ended"sv;
@@ -2379,6 +2385,13 @@ namespace stream {
       // If this is the first session, invoke the platform callbacks
       if (++running_sessions == 1) {
         platf::streaming_will_start();
+#ifdef _WIN32
+        // Cap games to the stream frame rate so the GPU doesn't render frames that are never sent
+        if (config::video.nv_frame_limiter && nvprefs_instance.load()) {
+          nvprefs_instance.apply_frame_limiter(static_cast<uint32_t>(session.config.monitor.framerate));
+          nvprefs_instance.unload();
+        }
+#endif
 #if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
         system_tray::update_tray_playing(proc::proc.get_last_run_app_name());
 #endif

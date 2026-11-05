@@ -2651,6 +2651,33 @@ consent prompt for directory ACLs, so the Web UI shows setup steps for correctin
     </tr>
 </table>
 
+### nvenc_frame_limiter
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            While a client is streaming, set the NVIDIA driver's global frame rate limiter (base profile) to the
+            frame rate requested by the client, so the GPU doesn't render frames that are never sent. The previous
+            limiter value is restored when the last stream ends, or on the next Sunshine start if it terminated
+            improperly. Games with a limiter in their own NVIDIA application profile keep it.
+            @note{Applies to Windows with NVIDIA GPUs only.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            disabled
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            nvenc_frame_limiter = enabled
+            @endcode</td>
+    </tr>
+</table>
+
 ### nvenc_h264_cavlc
 
 <table>

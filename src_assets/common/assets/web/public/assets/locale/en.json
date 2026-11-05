@@ -353,6 +353,8 @@
     "nvenc_h264_cavlc_desc": "Simpler form of entropy coding. CAVLC needs around 10% more bitrate for same quality. Only relevant for really old decoding devices.",
     "nvenc_latency_over_power": "Prefer lower encoding latency over power savings",
     "nvenc_latency_over_power_desc": "Sunshine requests maximum GPU clock speed while streaming to reduce encoding latency. Disabling it is not recommended since this can lead to significantly increased encoding latency.",
+    "nvenc_frame_limiter": "Limit games to the stream frame rate",
+    "nvenc_frame_limiter_desc": "While a client is streaming, set the NVIDIA driver's global frame rate limiter to the frame rate requested by the client, so the GPU doesn't render frames that are never sent. The previous limiter value is restored when the stream ends. Games with their own NVIDIA profile limit keep it.",
     "nvenc_opengl_vulkan_on_dxgi": "Present OpenGL/Vulkan on top of DXGI",
     "nvenc_opengl_vulkan_on_dxgi_desc": "Sunshine can't capture fullscreen OpenGL and Vulkan programs at full frame rate unless they present on top of DXGI. This is system-wide setting that is reverted on sunshine program exit.",
     "nvenc_preset": "Performance preset",

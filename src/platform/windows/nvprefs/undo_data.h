@@ -30,6 +30,7 @@ namespace nvprefs {
       };
 
       std::optional<opengl_swapchain_t> opengl_swapchain;  ///< Opengl swapchain.
+      std::optional<opengl_swapchain_t> frame_limiter;  ///< Base profile frame rate limiter, same value/undo shape.
     };
 
     /**
@@ -46,6 +47,33 @@ namespace nvprefs {
      * @return Stored OpenGL swapchain override and optional restore setting.
      */
     std::optional<data_t::opengl_swapchain_t> get_opengl_swapchain() const;
+
+    /**
+     * @brief Set the frame rate limiter value applied for the current stream.
+     *
+     * @param our_value Frame rate limiter value applied by Sunshine.
+     * @param undo_value Previous limiter value to restore, if present.
+     */
+    void set_frame_limiter(uint32_t our_value, std::optional<uint32_t> undo_value);
+
+    /**
+     * @brief Get the frame rate limiter undo record.
+     *
+     * @return Stored limiter override and optional restore value.
+     */
+    std::optional<data_t::opengl_swapchain_t> get_frame_limiter() const;
+
+    /**
+     * @brief Forget the frame rate limiter undo record.
+     */
+    void clear_frame_limiter();
+
+    /**
+     * @brief Check whether any setting still needs restoring.
+     *
+     * @return True when there is nothing to undo.
+     */
+    bool empty() const;
 
     /**
      * @brief Serialize undo data to its JSON representation.
