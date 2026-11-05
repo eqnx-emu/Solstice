@@ -17,6 +17,7 @@
 
 // platform includes
 #include <windows.h>
+#include <winioctl.h>  // CTL_CODE, required by sudovda.h
 
 // lib includes
 #include <sudovda/sudovda.h>

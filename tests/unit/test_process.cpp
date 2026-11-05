@@ -33,6 +33,10 @@
 #include <src/utility.h>
 #include <src/virtual_display.h>
 
+// test includes
+// Included after boost.process: the support header pulls in Windows headers that break boost.asio when first.
+#include "virtual_display_test_support.h"
+
 namespace fs = std::filesystem;
 
 namespace proc {
@@ -959,4 +963,50 @@ TEST(VirtualDisplayTest, ShouldUseVirtualDisplay) {
   EXPECT_FALSE(virtual_display::should_use(disabled, ""));
   EXPECT_FALSE(virtual_display::should_use(apps, ""));
   EXPECT_TRUE(virtual_display::should_use(always, ""));
+}
+
+/**
+ * @brief Fixture that runs a Desktop-style app on the global process registry over a fake virtual display.
+ *
+ * `proc_t::terminate` consults the global registry for the last app name, so the global instance is required.
+ */
+class ProcTerminate: public VirtualDisplay {
+protected:
+  void SetUp() override {
+    VirtualDisplay::SetUp();
+    proc::ctx_t app {};
+    app.id = "42";
+    app.name = "Desktop";
+    app.virtual_display = "enabled";
+    proc::proc.get_apps().push_back(std::move(app));
+  }
+
+  void TearDown() override {
+    proc::proc.terminate();
+    proc::proc.get_apps().clear();
+    VirtualDisplay::TearDown();
+  }
+};
+
+TEST_F(ProcTerminate, EndsVirtualDisplay) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, proc::proc.get_app_virtual_display(42)));
+  ASSERT_EQ(proc::proc.execute(42, std::make_shared<rtsp_stream::launch_session_t>()), 0);
+  ASSERT_TRUE(virtual_display::active());
+
+  proc::proc.terminate();
+
+  EXPECT_FALSE(virtual_display::active());
+  ASSERT_EQ(backend->removed.size(), 1);
+  EXPECT_EQ(config::video.output_name, physical_device_id);
+}
+
+TEST_F(ProcTerminate, KeepsVirtualDisplayWithoutARunningApp) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "enabled"));
+
+  proc::proc.terminate();
+
+  EXPECT_TRUE(virtual_display::active());
+  EXPECT_TRUE(backend->removed.empty());
 }

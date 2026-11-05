@@ -36,6 +36,7 @@
 #include "process_gamepad.h"
 #include "system_tray.h"
 #include "utility.h"
+#include "virtual_display.h"
 
 #ifdef _WIN32
   // from_utf8() string conversion function
@@ -414,7 +415,11 @@ namespace proc {
       system_tray::update_tray_stopped(proc::proc.get_last_run_app_name());
 #endif
 
-      display_device::revert_configuration();
+      if (virtual_display::active()) {
+        virtual_display::end();
+      } else {
+        display_device::revert_configuration();
+      }
     }
 
     _app_id = -1;

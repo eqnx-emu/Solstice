@@ -40,6 +40,7 @@
 #include "utility.h"
 #include "uuid.h"
 #include "video.h"
+#include "virtual_display.h"
 
 using namespace std::literals;
 
@@ -1382,7 +1383,11 @@ namespace nvhttp {
       response->close_connection_after_response = true;
 
       if (revert_display_configuration) {
-        display_device::revert_configuration();
+        if (virtual_display::active()) {
+          virtual_display::end();
+        } else {
+          display_device::revert_configuration();
+        }
       }
     });
 
@@ -1421,7 +1426,10 @@ namespace nvhttp {
       // We want to prepare display only if there are no active sessions at
       // the moment. This should be done before probing encoders as it could
       // change the active displays.
-      display_device::configure_display(config::video, *launch_session);
+      // A virtual display, when wanted, replaces the physical display configuration.
+      if (!virtual_display::begin(*launch_session, proc::proc.get_app_virtual_display(launch_session->appid))) {
+        display_device::configure_display(config::video, *launch_session);
+      }
 
       // Probe encoders again before streaming to ensure our chosen
       // encoder matches the active GPU (which could have changed
@@ -1533,7 +1541,10 @@ namespace nvhttp {
       // We want to prepare display only if there are no active sessions at
       // the moment. This should be done before probing encoders as it could
       // change the active displays.
-      display_device::configure_display(config::video, *launch_session);
+      // The running app decides whether the virtual display stays in use.
+      if (!virtual_display::begin(*launch_session, proc::proc.get_app_virtual_display(current_appid))) {
+        display_device::configure_display(config::video, *launch_session);
+      }
 
       // Probe encoders again before streaming to ensure our chosen
       // encoder matches the active GPU (which could have changed
@@ -1602,7 +1613,11 @@ namespace nvhttp {
     }
 
     // The config needs to be reverted regardless of whether "proc::proc.terminate()" was called or not.
-    display_device::revert_configuration();
+    if (virtual_display::active()) {
+      virtual_display::end();
+    } else {
+      display_device::revert_configuration();
+    }
   }
 
   /**

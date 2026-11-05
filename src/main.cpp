@@ -45,6 +45,7 @@
 #include "system_tray.h"
 #include "upnp.h"
 #include "video.h"
+#include "virtual_display.h"
 
 using namespace std::literals;
 
@@ -295,6 +296,9 @@ int main(int argc, char *argv[]) {
   if (!display_device_deinit_guard) {
     BOOST_LOG(error) << "Display device session failed to initialize"sv;
   }
+
+  // Opens the virtual display driver; never fails startup, sessions fall back to the physical display.
+  virtual_display::init();
 
 #ifdef _WIN32
   // Modify relevant NVIDIA control panel settings if the system has corresponding gpu

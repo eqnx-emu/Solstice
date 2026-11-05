@@ -37,6 +37,7 @@ extern "C" {
 #include "system_tray.h"
 #include "thread_safe.h"
 #include "utility.h"
+#include "virtual_display.h"
 
 constexpr int IDX_START_A = 0;  ///< Control-stream message index for the first stream-start packet.
 constexpr int IDX_START_B = 1;  ///< Control-stream message index for the second stream-start packet.
@@ -2333,7 +2334,11 @@ namespace stream {
         }
 
         if (revert_display_config) {
-          display_device::revert_configuration();
+          if (virtual_display::active() && !proc::proc.running()) {
+            virtual_display::end();
+          } else {
+            display_device::revert_configuration();
+          }
         }
 
         platf::streaming_will_stop();
