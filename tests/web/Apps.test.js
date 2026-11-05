@@ -8,7 +8,7 @@ vi.mock('../../src_assets/common/assets/web/fetch_utils', () => ({
 }))
 
 import { apiFetch } from '../../src_assets/common/assets/web/fetch_utils'
-import Apps from '../../src_assets/common/assets/web/Apps.vue'
+import Apps, { pickBestCover } from '../../src_assets/common/assets/web/Apps.vue'
 
 beforeEach(() => vi.clearAllMocks())
 afterEach(() => vi.unstubAllGlobals())
@@ -271,5 +271,63 @@ describe('fileBrowserNavigate', () => {
     expect(ctx.fileBrowserError).toBe('Invalid JSON')
     expect(ctx.fileBrowserLoading).toBe(false)
     expect(ctx.fileBrowserCurrentPath).toBe('/old')
+  })
+})
+
+describe('pickBestCover', () => {
+  const candidates = [
+    { name: 'Final Fantasy VII Remake Intergrade: Episode INTERmission', key: 'igdb_3' },
+    { name: 'Final Fantasy VII Remake Intergrade', key: 'igdb_2' },
+    { name: 'Final Fantasy VII Remake', key: 'igdb_1' },
+  ]
+
+  it('prefers an exact match ignoring case and punctuation', () => {
+    expect(pickBestCover('FINAL FANTASY VII REMAKE', candidates).key).toBe('igdb_1')
+  })
+
+  it('falls back to the shortest name that starts with the app name', () => {
+    expect(pickBestCover('Final Fantasy VII Remake Inter', candidates).key).toBe('igdb_2')
+  })
+
+  it('returns null when nothing matches', () => {
+    expect(pickBestCover('Hades', candidates)).toBeNull()
+    expect(pickBestCover('', candidates)).toBeNull()
+    expect(pickBestCover('Hades', [])).toBeNull()
+  })
+})
+
+describe('fetchMissingCovers', () => {
+  it('uploads the best cover and saves it on each app without an image', async () => {
+    const bucket = { 1: { name: 'Hades' }, 2: { name: 'Hades II' } }
+    const games = {
+      1: { id: 1, name: 'Hades', cover: { url: '//images.igdb.com/t_thumb/hadesslug.jpg' } },
+      2: { id: 2, name: 'Hades II', cover: { url: '//images.igdb.com/t_thumb/hades2slug.jpg' } },
+    }
+    vi.stubGlobal('fetch', vi.fn(url => {
+      if (url.includes('/buckets/')) return Promise.resolve({ ok: true, json: async () => bucket })
+      const id = url.match(/games\/(\d+)\.json/)[1]
+      return Promise.resolve({ ok: true, json: async () => games[id] })
+    }))
+    apiFetch.mockImplementation(url => Promise.resolve(url.includes('covers/upload')
+      ? { ok: true, json: async () => ({ path: 'C:/covers/igdb_1.png' }) }
+      : { status: 200 }))
+
+    const ctx = {
+      apps: [{ name: 'Desktop', 'image-path': 'desktop.png' }, { name: 'Hades' }],
+      coverFetch: {},
+      loadApps: vi.fn(() => Promise.resolve()),
+      $t: (key, args) => `${key}:${JSON.stringify(args)}`,
+    }
+    ctx.appsMissingCovers = Apps.computed.appsMissingCovers.call(ctx)
+
+    await Apps.methods.fetchMissingCovers.call(ctx)
+
+    const upload = apiFetch.mock.calls.find(([url]) => url.includes('covers/upload'))
+    expect(JSON.parse(upload[1].body).key).toBe('igdb_1')
+    const save = apiFetch.mock.calls.find(([url]) => url === './api/apps')
+    expect(JSON.parse(save[1].body)).toMatchObject({ name: 'Hades', index: 1, 'image-path': 'C:/covers/igdb_1.png' })
+    expect(ctx.loadApps).toHaveBeenCalledOnce()
+    expect(ctx.coverFetch.running).toBe(false)
+    expect(ctx.coverFetch.summary).toContain('"found":1')
   })
 })
