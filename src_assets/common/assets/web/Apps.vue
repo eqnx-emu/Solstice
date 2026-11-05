@@ -30,6 +30,14 @@
         <arrow-down v-else :size="16" class="icon"></arrow-down>
         {{ $t('apps.sort_by_name') }}
       </button>
+      <button v-if="appsMissingCovers.length > 0 || coverFetch.running" class="btn btn-sx text-nowrap" type="button"
+              @click="fetchMissingCovers" :disabled="coverFetch.running"
+              :title="$t('apps.fetch_missing_covers_desc')">
+        <image-down :size="16" class="icon"></image-down>
+        <span v-if="coverFetch.running">{{ $t('apps.fetching_covers', { done: coverFetch.done, total: coverFetch.total }) }}</span>
+        <span v-else>{{ $t('apps.fetch_missing_covers') }} ({{ appsMissingCovers.length }})</span>
+      </button>
+      <span v-if="coverFetch.summary" class="sx-hint" role="status">{{ coverFetch.summary }}</span>
     </div>
 
     <!-- Apps list -->
@@ -566,6 +574,7 @@
     FolderOpen,
     FolderUp,
     HardDrive,
+    ImageDown,
     Pencil,
     Play,
     Plus,
@@ -634,6 +643,41 @@
         }).filter(Boolean));
   }
 
+  /**
+   * Normalize a game or application name for loose comparison.
+   *
+   * @param {string} name Name to normalize.
+   * @returns {string} Lowercase name with only letters and digits.
+   */
+  export function normalizeCoverName(name) {
+    return (name || '').toLowerCase().normalize('NFKD').replaceAll(/[^a-z\d]/g, '');
+  }
+
+  /**
+   * Pick the cover candidate that best matches an application name.
+   *
+   * Prefers an exact (normalized) name match, then the shortest name that
+   * starts with the application name, which avoids picking a sequel or DLC.
+   *
+   * @param {string} appName Application name.
+   * @param {object[]} candidates Results from searchCovers().
+   * @returns {object|null} Best candidate, or null when nothing fits.
+   */
+  export function pickBestCover(appName, candidates) {
+    const target = normalizeCoverName(appName);
+    if (!target || !candidates || candidates.length === 0) {
+      return null;
+    }
+    const exact = candidates.find(c => normalizeCoverName(c.name) === target);
+    if (exact) {
+      return exact;
+    }
+    const prefixed = candidates
+      .filter(c => normalizeCoverName(c.name).startsWith(target))
+      .sort((a, b) => a.name.length - b.name.length);
+    return prefixed[0] || null;
+  }
+
   export default {
     components: {
       Navbar,
@@ -648,6 +692,7 @@
       FolderOpen,
       FolderUp,
       HardDrive,
+      ImageDown,
       Pencil,
       Play,
       Plus,
@@ -668,6 +713,7 @@
         coverFinderBusy: false,
         coverCandidates: [],
         coverSearchQuery: "",
+        coverFetch: { running: false, done: 0, total: 0, summary: "" },
         platform: "",
         fileBrowserType: "any",
         fileBrowserTitle: "",
@@ -732,6 +778,11 @@
           default:
             return this.$t("apps.sort_default");
         }
+      },
+      appsMissingCovers() {
+        return this.apps
+          .map((app, index) => ({ app, index }))
+          .filter(({ app }) => !app['image-path']);
       },
       appCountLabel() {
         const total = this.apps.length;
@@ -855,6 +906,51 @@
       },
       addDetached() {
         this.editForm.detached.push("");
+      },
+      /**
+       * Search GameDB for every application without a cover and save the best match.
+       *
+       * Applications are processed one at a time so the host is not flooded with
+       * downloads, and a failure on one application does not stop the others.
+       */
+      async fetchMissingCovers() {
+        const targets = this.appsMissingCovers;
+        this.coverFetch = { running: true, done: 0, total: targets.length, summary: "" };
+        let found = 0;
+
+        for (const { app, index } of targets) {
+          try {
+            const cover = pickBestCover(app.name, await searchCovers(app.name));
+            if (cover) {
+              const upload = await apiFetch("./api/covers/upload", {
+                method: "POST",
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: cover.key, url: cover.saveUrl }),
+              });
+              if (!upload.ok) throw new Error("Failed to download cover");
+              const { path } = await upload.json();
+
+              const updated = structuredClone(toRaw(app));
+              updated.index = index;
+              updated['image-path'] = path;
+              const saved = await apiFetch("./api/apps", {
+                method: "POST",
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updated),
+              });
+              if (saved.status === 200) found++;
+            }
+          } catch (e) {
+            console.warn(`Cover lookup failed for ${app.name}`, e);
+          }
+          this.coverFetch.done++;
+        }
+
+        await this.loadApps();
+        this.coverFetch = {
+          running: false, done: 0, total: 0,
+          summary: this.$t('apps.fetch_covers_result', { found, total: targets.length }),
+        };
       },
       showCoverFinder() {
         // Reset search state
