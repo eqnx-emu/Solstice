@@ -19,12 +19,12 @@ env:
   PYTHON_VERSION: '3.14'
   VIIPER_VERSION: 'v0.9.0'
   VIIPER_SHA256: '341180d887a6d04f2b42a5d10c7743a9c84125272d99dfe5cf76a2a15ca1167c'
-  # TODO(virtual-display): SudoMaker/SudoVDA publishes no GitHub releases, so there is no official SudoVDA.dll asset.
-  # Replace these placeholders with a real tag, asset URL and checksum (build from source or a trusted mirror).
-  # The bundled sudovda.cat only validates the DLL it was signed with, so the DLL must match DriverVer 1.10.9.289.
-  SUDOVDA_VERSION: 'PLACEHOLDER-NO-OFFICIAL-RELEASE'
-  SUDOVDA_URL: 'https://example.invalid/PLACEHOLDER/SudoVDA.dll'
-  SUDOVDA_SHA256: '0000000000000000000000000000000000000000000000000000000000000000'
+  # SudoMaker/SudoVDA publishes no GitHub releases, so SudoVDA.dll is taken from the Apollo release installer.
+  # The bundled SudoVDA.inf, sudovda.cat and sudovda.cer are byte-identical to the ones in that installer, so the
+  # DLL matches the catalog it was signed with. Both the installer and the extracted DLL are checksum-pinned.
+  SUDOVDA_APOLLO_VERSION: 'v0.4.6'
+  SUDOVDA_APOLLO_SHA256: '42b2aefaacb3474511517a56b96ee9f0517f30ac38b5dd2fda9fd5b478f5021a'
+  SUDOVDA_SHA256: '47ee263cb5de9382c6630a2d7f3dafec4a49419f953beec869ca5dd0c460ff63'
   NEFCON_VERSION: 'v1.21.0'
   NEFCON_SHA256: '4c8e68f6b663598d77b7c3f76459b16fad00994e53ea8af0bd106a805dd5c18b'
 
@@ -107,7 +107,13 @@ jobs:
         run: |
           set -euo pipefail
           dest="src_assets/windows/drivers/sudovda"
-          curl -fsSL -o SudoVDA.dll "${SUDOVDA_URL}"
+          apollo_tag="${SUDOVDA_APOLLO_VERSION}"
+          curl -fsSL -o apollo.exe \
+            "https://github.com/ClassicOldSong/Apollo/releases/download/${apollo_tag}/Apollo-${apollo_tag#v}.exe"
+          echo "${SUDOVDA_APOLLO_SHA256}  apollo.exe" | sha256sum -c -
+          mkdir -p apollo
+          "/c/Program Files/7-Zip/7z.exe" e -y -oapollo apollo.exe 'drivers\sudovda\SudoVDA.dll'
+          cp apollo/SudoVDA.dll SudoVDA.dll
           echo "${SUDOVDA_SHA256}  SudoVDA.dll" | sha256sum -c -
           curl -fsSL -o nefcon.zip \
             "https://github.com/nefarius/nefcon/releases/download/${NEFCON_VERSION}/nefcon_${NEFCON_VERSION}.zip"
