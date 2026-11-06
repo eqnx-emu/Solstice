@@ -1657,7 +1657,7 @@ namespace nvhttp {
       // the moment. This should be done before probing encoders as it could
       // change the active displays.
       // A virtual display, when wanted, replaces the physical display configuration.
-      if (!virtual_display::begin(*launch_session, proc::proc.get_app_virtual_display(launch_session->appid))) {
+      if (!virtual_display::begin(*launch_session, proc::proc.get_app_virtual_display(launch_session->appid), virtual_display::start_e::launch)) {
         display_device::configure_display(config::video, *launch_session);
       }
 
@@ -1771,8 +1771,9 @@ namespace nvhttp {
       // We want to prepare display only if there are no active sessions at
       // the moment. This should be done before probing encoders as it could
       // change the active displays.
-      // The running app decides whether the virtual display stays in use.
-      if (!virtual_display::begin(*launch_session, proc::proc.get_app_virtual_display(current_appid))) {
+      // The running app decides whether the virtual display stays in use; a resume only creates one
+      // when the app was launched on a virtual display.
+      if (!virtual_display::begin(*launch_session, proc::proc.get_app_virtual_display(current_appid), virtual_display::start_e::resume)) {
         display_device::configure_display(config::video, *launch_session);
       }
 

@@ -2322,6 +2322,8 @@ namespace stream {
 
       // If this is the last session, invoke the platform callbacks
       if (--running_sessions == 0) {
+        // The capture threads are gone, so a virtual display teardown deferred by end() can run now.
+        virtual_display::streaming_stopped();
         bool revert_display_config {config::video.dd.config_revert_on_disconnect};
         const bool app_running {proc::proc.running() != 0};
         if (app_running) {
@@ -2394,6 +2396,7 @@ namespace stream {
 
       // If this is the first session, invoke the platform callbacks
       if (++running_sessions == 1) {
+        virtual_display::streaming_started();
         platf::streaming_will_start();
 #ifdef _WIN32
         // Cap games to the stream frame rate so the GPU doesn't render frames that are never sent

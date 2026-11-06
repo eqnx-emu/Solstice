@@ -45,8 +45,12 @@ namespace platf::vdisplay {
   SUDOVDA::VIRTUAL_DISPLAY_ADD_PARAMS make_add_params(const mode_t &mode, const GUID &guid, std::string_view name, std::string_view serial);
 
   /**
-   * @brief Derive a stable monitor identifier from a client unique id.
-   * @param unique_id The client unique id. Empty ids map to a fixed default identifier.
+   * @brief Derive a stable monitor identifier from a client identity.
+   *
+   * The identifier is the SHA-256 digest of the identity, truncated to 16 bytes and marked as a UUID version 8.
+   *
+   * @param unique_id The client identity (the paired client's PEM certificate, or its unique id as a fallback).
+   *                  Empty identities map to a fixed default identifier.
    * @return A deterministic identifier.
    */
   guid_t guid_from_client_id(std::string_view unique_id);

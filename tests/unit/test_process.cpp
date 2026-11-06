@@ -1010,7 +1010,8 @@ TEST_F(ProcParse, OmitsNetworkTestAppWhenToolAbsent) {
 
 TEST(VirtualDisplayTest, ShouldUseVirtualDisplay) {
   using enum config::video_t::virtual_display_e;
-  EXPECT_TRUE(virtual_display::should_use(disabled, "enabled"));
+  // The global "disabled" is a master switch that also ignores per-app "enabled".
+  EXPECT_FALSE(virtual_display::should_use(disabled, "enabled"));
   EXPECT_TRUE(virtual_display::should_use(apps, "enabled"));
   EXPECT_TRUE(virtual_display::should_use(always, "enabled"));
   EXPECT_FALSE(virtual_display::should_use(disabled, "disabled"));
@@ -1051,23 +1052,25 @@ protected:
 
 TEST_F(ProcTerminate, EndsVirtualDisplay) {
   auto session {make_session(1280, 720, 60)};
-  ASSERT_TRUE(virtual_display::begin(*session, proc::proc.get_app_virtual_display(42)));
+  ASSERT_TRUE(virtual_display::begin(*session, proc::proc.get_app_virtual_display(42), virtual_display::start_e::launch));
   ASSERT_EQ(proc::proc.execute(42, std::make_shared<rtsp_stream::launch_session_t>()), 0);
   ASSERT_TRUE(virtual_display::active());
 
   proc::proc.terminate();
 
   EXPECT_FALSE(virtual_display::active());
-  ASSERT_EQ(backend->removed.size(), 1);
+  // One removal of a possible leftover before creating, one at the end.
+  ASSERT_EQ(backend->removed.size(), 2);
   EXPECT_EQ(config::video.output_name, physical_device_id);
 }
 
 TEST_F(ProcTerminate, KeepsVirtualDisplayWithoutARunningApp) {
   auto session {make_session(1280, 720, 60)};
-  ASSERT_TRUE(virtual_display::begin(*session, "enabled"));
+  ASSERT_TRUE(virtual_display::begin(*session, "enabled", virtual_display::start_e::launch));
 
   proc::proc.terminate();
 
   EXPECT_TRUE(virtual_display::active());
-  EXPECT_TRUE(backend->removed.empty());
+  // Only the removal of a possible leftover before creating.
+  EXPECT_EQ(backend->removed.size(), 1);
 }

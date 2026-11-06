@@ -1159,14 +1159,15 @@ consent prompt for directory ACLs, so the Web UI shows setup steps for correctin
             If the Solstice virtual display driver is missing or fails, streaming falls back to the physical display.
             <br>
             <br>
-            - `disabled`: Never use a virtual display, unless an app enables it.
+            - `disabled`: Never use a virtual display, even for apps whose "Virtual Display" option is enabled.
             <br>
             - `apps`: Use a virtual display only for apps whose "Virtual Display" option is enabled.
             <br>
             - `always`: Use a virtual display for every app, except those that disable it.
             <br>
             <br>
-            Each app can override this setting with its own `virtual-display` option (`enabled` or `disabled`).
+            With `apps` or `always`, each app can override this setting with its own `virtual-display` option
+            (`enabled` or `disabled`). With `disabled`, the per-app option is ignored.
             @note{Applies to Windows only.}
         </td>
     </tr>
@@ -1185,7 +1186,7 @@ consent prompt for directory ACLs, so the Web UI shows setup steps for correctin
     <tr>
         <td>Choices</td>
         <td>disabled</td>
-        <td>Never use a virtual display, unless an app enables it.</td>
+        <td>Never use a virtual display, even for apps that enable it.</td>
     </tr>
     <tr>
         <td></td>

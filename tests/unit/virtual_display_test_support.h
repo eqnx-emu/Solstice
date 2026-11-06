@@ -9,10 +9,12 @@
 
 // standard includes
 #include <atomic>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -92,6 +94,7 @@ namespace virtual_display_test {
 
     virtual_display::driver_status_e open() override {
       log->add("open");
+      status_value = open_status.value_or(status_value);
       return status_value;
     }
 
@@ -113,6 +116,7 @@ namespace virtual_display_test {
 
     std::shared_ptr<call_log_t> log;  ///< Shared call log.
     virtual_display::driver_status_e status_value;  ///< Reported status.
+    std::optional<virtual_display::driver_status_e> open_status;  ///< Status adopted by `open`, if set.
     std::optional<std::string> create_result;  ///< Value returned by `create`.
     std::vector<create_call_t> creates;  ///< Recorded `create` arguments.
     std::vector<virtual_display::guid_t> removed;  ///< Recorded `remove` arguments.
@@ -188,16 +192,31 @@ namespace virtual_display_test {
   };
 
   /**
-   * @brief Expected identifier for a client id.
-   * @param unique_id The client unique id.
+   * @brief Expected identifier for a client identity.
+   * @param identity The client certificate, or the unique id of a session without one.
    * @return The identifier the orchestrator should pass to the backend.
    */
-  inline virtual_display::guid_t expected_guid([[maybe_unused]] std::string_view unique_id) {
+  inline virtual_display::guid_t expected_guid([[maybe_unused]] std::string_view identity) {
 #ifdef _WIN32
-    return platf::vdisplay::guid_from_client_id(unique_id);
+    return platf::vdisplay::guid_from_client_id(identity);
 #else
     return virtual_display::guid_t {};
 #endif
+  }
+
+  /**
+   * @brief Expected EDID serial for a monitor identifier: its first 13 uppercase hexadecimal digits.
+   * @param guid The monitor identifier.
+   * @return The serial the orchestrator should pass to the backend.
+   */
+  inline std::string expected_serial(const virtual_display::guid_t &guid) {
+    constexpr std::string_view digits {"0123456789ABCDEF"};
+    std::string hex;
+    for (const auto byte : guid.bytes) {
+      hex.push_back(digits[byte >> 4]);
+      hex.push_back(digits[byte & 0x0f]);
+    }
+    return hex.substr(0, 13);
   }
 
   /**
@@ -206,14 +225,16 @@ namespace virtual_display_test {
    * @param height Requested height.
    * @param fps Requested frame rate.
    * @param unique_id Client unique id.
+   * @param client_cert Paired client certificate, empty for none.
    * @return The session (heap allocated because launch sessions cannot be copied or moved).
    */
-  inline std::unique_ptr<rtsp_stream::launch_session_t> make_session(int width, int height, int fps, std::string unique_id = "switch-1") {
+  inline std::unique_ptr<rtsp_stream::launch_session_t> make_session(int width, int height, int fps, std::string unique_id = "switch-1", std::string client_cert = {}) {
     auto session {std::make_unique<rtsp_stream::launch_session_t>()};
     session->width = width;
     session->height = height;
     session->fps = fps;
     session->unique_id = std::move(unique_id);
+    session->client_cert = std::move(client_cert);
     session->enable_hdr = true;
     return session;
   }
@@ -226,6 +247,8 @@ class VirtualDisplay: public BaseTest {
 protected:
   void SetUp() override {
     BaseTest::SetUp();
+    std::error_code ec;
+    std::filesystem::remove(state_file, ec);
     saved_video = config::video;
     config::video.virtual_display = virtual_display_test::virtual_display_e::always;
     config::video.output_name = virtual_display_test::physical_device_id;
@@ -242,6 +265,8 @@ protected:
   void TearDown() override {
     virtual_display::end();
     virtual_display::test_install_backend(nullptr);
+    std::error_code ec;
+    std::filesystem::remove(state_file, ec);
     display_device::test_reset_display_device();
     config::video = saved_video;
     BaseTest::TearDown();
@@ -259,6 +284,7 @@ protected:
   }
 
   config::video_t saved_video {};  ///< Video config restored after the test.
+  std::filesystem::path state_file {std::filesystem::temp_directory_path() / "sunshine_test_virtual_display.state"};  ///< State file used by init tests.
   std::shared_ptr<virtual_display_test::call_log_t> log;  ///< Shared call log.
   virtual_display_test::fake_backend_t *backend {nullptr};  ///< Installed fake backend.
   virtual_display_test::recording_settings_manager_t *settings {nullptr};  ///< Installed settings manager.

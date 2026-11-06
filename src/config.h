@@ -237,7 +237,7 @@ namespace config {
      * @brief Selects when Sunshine streams from a dedicated virtual display.
      */
     enum class virtual_display_e {
-      disabled,  ///< Never create a virtual display.
+      disabled,  ///< Never create a virtual display, even for apps that enable it.
       apps,  ///< Create a virtual display only for apps that enable it.
       always  ///< Create a virtual display for every app except those that disable it.
     };

@@ -435,7 +435,17 @@ if ($Action -eq "install") {
         -Emoji "🛡️"
     Write-Information ""
 
-    # 4. Install service
+    # 4. Install the virtual display driver (optional, failures are only logged).
+    # This runs before the service is installed and started, so that Sunshine finds the driver when it starts.
+    $currentStep++
+    Write-Progress `
+        -Activity "Installing Sunshine" `
+        -Status "Installing virtual display driver" `
+        -PercentComplete (($currentStep / $totalSteps) * 100)
+    Invoke-SudoVdaScript -ScriptName "install.ps1" -Description "Installing virtual display driver (SudoVDA)"
+    Write-Information ""
+
+    # 5. Install service
     $currentStep++
     Write-Progress `
         -Activity "Installing Sunshine" `
@@ -448,7 +458,7 @@ if ($Action -eq "install") {
         -Emoji "⚡"
     Write-Information ""
 
-    # 5. Configure autostart
+    # 6. Configure autostart
     $currentStep++
     Write-Progress `
         -Activity "Installing Sunshine" `
@@ -459,15 +469,6 @@ if ($Action -eq "install") {
         -ScriptPath $autostartScript `
         -Description "Configuring autostart" `
         -Emoji "🚀"
-    Write-Information ""
-
-    # 6. Install the virtual display driver (optional, failures are only logged)
-    $currentStep++
-    Write-Progress `
-        -Activity "Installing Sunshine" `
-        -Status "Installing virtual display driver" `
-        -PercentComplete (($currentStep / $totalSteps) * 100)
-    Invoke-SudoVdaScript -ScriptName "install.ps1" -Description "Installing virtual display driver (SudoVDA)"
     Write-Information ""
 
     Write-Progress -Activity "Installing Sunshine" -Completed

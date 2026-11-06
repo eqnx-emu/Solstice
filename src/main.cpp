@@ -297,8 +297,9 @@ int main(int argc, char *argv[]) {
     BOOST_LOG(error) << "Display device session failed to initialize"sv;
   }
 
-  // Opens the virtual display driver; never fails startup, sessions fall back to the physical display.
-  virtual_display::init();
+  // Opens the virtual display driver and cleans up after a crash; never fails startup, sessions fall back to the physical display.
+  // Runs after display_device::init so a display configuration persisted by a crash can be reverted against the re-created display.
+  virtual_display::init(platf::appdata() / "virtual_display.state");
 
 #ifdef _WIN32
   // Modify relevant NVIDIA control panel settings if the system has corresponding gpu

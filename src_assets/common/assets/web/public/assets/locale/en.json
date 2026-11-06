@@ -111,7 +111,7 @@
     "sort_default": "Default order",
     "sort_descending": "Descending",
     "virtual_display": "Virtual Display",
-    "virtual_display_desc": "Stream this app on a dedicated virtual display instead of a physical monitor. Requires the Solstice virtual display driver.",
+    "virtual_display_desc": "Stream this app on a dedicated virtual display instead of a physical monitor. Requires the Solstice virtual display driver. Ignored when the global Virtual Display setting is disabled.",
     "virtual_display_disabled": "Virtual display: off",
     "virtual_display_enabled": "Virtual display: on",
     "virtual_display_global": "Use global setting",
