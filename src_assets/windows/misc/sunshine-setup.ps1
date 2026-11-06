@@ -505,15 +505,6 @@ if ($Action -eq "install") {
     $totalSteps = 5
     $currentStep = 0
 
-    # 0. Remove the virtual display driver (failures are only logged)
-    $currentStep++
-    Write-Progress `
-        -Activity "Uninstalling Sunshine" `
-        -Status "Removing virtual display driver" `
-        -PercentComplete (($currentStep / $totalSteps) * 100)
-    Invoke-SudoVdaScript -ScriptName "uninstall.ps1" -Description "Removing virtual display driver (SudoVDA)"
-    Write-Information ""
-
     # 1. Delete firewall rules
     $currentStep++
     Write-Progress `
@@ -540,7 +531,17 @@ if ($Action -eq "install") {
         -Emoji "⚡"
     Write-Information ""
 
-    # 3. Restore NVIDIA preferences
+    # 3. Remove the virtual display driver (failures are only logged).
+    # This runs after the service is stopped, so that Sunshine no longer holds the driver open.
+    $currentStep++
+    Write-Progress `
+        -Activity "Uninstalling Sunshine" `
+        -Status "Removing virtual display driver" `
+        -PercentComplete (($currentStep / $totalSteps) * 100)
+    Invoke-SudoVdaScript -ScriptName "uninstall.ps1" -Description "Removing virtual display driver (SudoVDA)"
+    Write-Information ""
+
+    # 4. Restore NVIDIA preferences
     $currentStep++
     Write-Progress `
         -Activity "Uninstalling Sunshine" `
@@ -552,7 +553,7 @@ if ($Action -eq "install") {
         -Emoji "🎮"
     Write-Information ""
 
-    # 4. Update PATH (remove)
+    # 5. Update PATH (remove)
     $currentStep++
     Write-Progress `
         -Activity "Uninstalling Sunshine" `

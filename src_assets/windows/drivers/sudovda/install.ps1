@@ -3,8 +3,9 @@
 Installs the SudoVDA virtual display driver (idempotent).
 
 .DESCRIPTION
-Trusts the driver certificate, recreates the device node (unless one is still present and could not be
-removed, in which case only the driver is updated) and installs the driver.
+Trusts the driver certificate, recreates the device node (unless one is still present, or the device nodes
+could not be enumerated and the old one could not be removed, in which case only the driver is updated)
+and installs the driver.
 Every external command is checked. Exits non-zero on failure so the caller can log it.
 Paths are resolved relative to this script.
 #>
@@ -45,6 +46,8 @@ function Invoke-Checked {
 
 # List the instance IDs of the existing SudoVDA device nodes.
 # Returns an array (possibly empty), or $null when the devices could not be enumerated.
+# The arrays are returned with the unary comma so that PowerShell does not unroll them: an empty array would
+# otherwise become $null (indistinguishable from a failed enumeration) and a single ID a plain string.
 # pnputil output is localised, so instance IDs are matched by their shape (ROOT\<enumerator>\<number>) instead of by label.
 function Get-SudoVdaInstanceIds {
     $pnputil = Join-Path $env:SystemRoot 'System32\pnputil.exe'
@@ -55,14 +58,14 @@ function Get-SudoVdaInstanceIds {
                     Select-String -Pattern '(?i)\bROOT\\[^\\\s]+\\\d+' -AllMatches |
                     ForEach-Object { $_.Matches } | ForEach-Object { $_.Value.ToUpperInvariant() } |
                     Sort-Object -Unique)
-            return $ids
+            return ,$ids
         }
     } catch {
         Write-Warning "pnputil could not enumerate devices: $($_.Exception.Message)"
     }
     try {
         $devices = @(Get-PnpDevice -ErrorAction Stop | Where-Object { $_.HardwareID -contains $HardwareId })
-        return @($devices | ForEach-Object { "$($_.InstanceId)".ToUpperInvariant() } | Sort-Object -Unique)
+        return ,@($devices | ForEach-Object { "$($_.InstanceId)".ToUpperInvariant() } | Sort-Object -Unique)
     } catch {
         Write-Warning "Could not enumerate SudoVDA device nodes: $($_.Exception.Message)"
         return $null
@@ -97,17 +100,30 @@ Write-Host 'Removing any previous SudoVDA device node'
 $removed = Invoke-Checked $Nefcon @('--remove-device-node', '--hardware-id', $HardwareId, '--class-guid', $ClassGuid) -AllowFailure
 
 # Creating a node while one still exists would leave a duplicate, so check first.
+# A node is created only when enumeration found none, or when enumeration failed but the removal succeeded.
 $existing = Get-SudoVdaInstanceIds
-if ($null -ne $existing -and $existing.Count -gt 1) {
-    Write-Warning "Multiple SudoVDA device nodes exist: $($existing -join ', ')"
-}
-if ($null -ne $existing -and $existing.Count -ge 1) {
+if ($null -eq $existing) {
+    if ($removed) {
+        Write-Host 'Could not enumerate SudoVDA device nodes, but the previous node was removed'
+        $create = $true
+    } else {
+        Write-Warning 'Could not enumerate SudoVDA device nodes and the previous node could not be removed; not creating another, updating the driver only'
+        $create = $false
+    }
+} elseif ($existing.Count -ge 1) {
+    if ($existing.Count -gt 1) {
+        Write-Warning "Multiple SudoVDA device nodes exist: $($existing -join ', ')"
+    }
     if ($removed) {
         Write-Host "A SudoVDA device node is still present after removal ($($existing -join ', ')), not creating another"
     } else {
         Write-Host "The previous SudoVDA device node could not be removed ($($existing -join ', ')), not creating another and updating its driver"
     }
+    $create = $false
 } else {
+    $create = $true
+}
+if ($create) {
     Write-Host 'Creating the SudoVDA device node'
     $null = Invoke-Checked $Nefcon @('--create-device-node', '--class-name', 'Display', '--class-guid', $ClassGuid, '--hardware-id', $HardwareId)
 }
