@@ -16,6 +16,7 @@
 #include <span>
 #include <string>
 #include <utility>
+#include <vector>
 
 // lib includes
 #include <boost/asio/ssl/context.hpp>
@@ -99,7 +100,7 @@ namespace nvhttp {
       std::weak_ptr<Connection> connection;
       {
         std::lock_guard lock {connections_mutex};
-        if (auto it = connections.find(request->remote_endpoint()); it != connections.end()) {
+        if (auto it = connections_by_endpoint.find(request->remote_endpoint()); it != connections_by_endpoint.end()) {
           connection = it->second;
         }
       }
@@ -114,8 +115,8 @@ namespace nvhttp {
     std::function<void(std::shared_ptr<Response>, std::shared_ptr<Request>)> on_verify_failed;  ///< Handler used to return the pairing challenge when client verification fails.
 
   protected:
-    std::mutex connections_mutex;  ///< Guards connections.
-    std::map<boost::asio::ip::tcp::endpoint, std::weak_ptr<Connection>> connections;  ///< Live connections by remote endpoint, for connection_closer().
+    std::mutex connections_mutex;  ///< Guards connections_by_endpoint.
+    std::map<boost::asio::ip::tcp::endpoint, std::weak_ptr<Connection>> connections_by_endpoint;  ///< Live connections by remote endpoint, for connection_closer().
 
     /**
      * @brief Remember a connection by its remote endpoint, dropping entries for closed connections.
@@ -129,10 +130,10 @@ namespace nvhttp {
         return;
       }
       std::lock_guard lock {connections_mutex};
-      std::erase_if(connections, [](const auto &entry) {
+      std::erase_if(connections_by_endpoint, [](const auto &entry) {
         return entry.second.expired();
       });
-      connections[endpoint] = connection;
+      connections_by_endpoint[endpoint] = connection;
     }
 
     boost::asio::ssl::context context {boost::asio::ssl::context::tls_server};  ///< TLS server context configured with Sunshine's certificate and protocol policy.
@@ -1423,13 +1424,13 @@ namespace nvhttp {
     response->write(SimpleWeb::StatusCode::success_ok, "", SimpleWeb::CaseInsensitiveMultimap {{"Cache-Control", "no-store"}});
   }
 
-  constexpr std::size_t speedtest_queue_depth = 3;  ///< Blocks kept queued ahead so a single round trip does not cap throughput.
-  constexpr std::chrono::seconds speedtest_grace {2};  ///< Extra time past the deadline before a stalled stream is cut off.
-
   /**
-   * @brief State of one in-flight speed test download, kept alive by pending callbacks.
+   * @brief State of one in-flight speed test download.
    * @details All members are guarded by `mutex`. The slot is released exactly once by speedtest_finish_locked(),
-   * whichever of normal completion, write error, deadline timer or exception happens first.
+   * whichever of normal completion, write error, deadline timer, exception or server stop happens first.
+   * The state is owned by the registry of running speed tests until it finishes; the response's queued send
+   * callbacks and the timer only hold weak references, so no ownership cycle (state, response, queued callback,
+   * state) keeps it alive when Simple-Web-Server drops the callbacks on stop without calling them.
    */
   struct speedtest_stream_t {
     /**
@@ -1446,6 +1447,7 @@ namespace nvhttp {
         slot {std::move(slot_)},
         close_connection {std::move(close_connection_)},
         timer {io},
+        start {std::chrono::steady_clock::now()},
         deadline {deadline_} {
     }
 
@@ -1454,17 +1456,27 @@ namespace nvhttp {
     speedtest::slot_t slot;  ///< Concurrency slot; released by speedtest_finish_locked().
     std::function<void()> close_connection;  ///< Forcibly closes the connection, failing pending writes.
     boost::asio::steady_timer timer;  ///< Cuts the stream off if writes stall past the deadline plus grace.
+    std::chrono::steady_clock::time_point start;  ///< Time the stream started, for the rate estimate.
     std::chrono::steady_clock::time_point deadline;  ///< Time at which new blocks stop being queued.
     std::size_t sent_blocks = 0;  ///< Number of data blocks queued so far.
+    std::size_t completed_bytes = 0;  ///< Data bytes whose send has completed.
     std::size_t in_flight = 0;  ///< Chunks queued whose send has not completed.
     bool final_sent = false;  ///< Whether the terminating chunk has been queued.
     bool finished = false;  ///< Whether the stream already ended and released its resources.
   };
 
   /**
-   * @brief End the stream: release the slot and stop the timer. Safe to call repeatedly.
+   * @brief Registry that owns the running speed tests, so that a server stop can finish them.
+   */
+  struct {
+    std::mutex mutex;  ///< Guards streams.
+    std::vector<std::shared_ptr<speedtest_stream_t>> streams;  ///< Speed tests that have not finished.
+  } speedtest_registry;
+
+  /**
+   * @brief End the stream: release the slot, stop the timer and drop the registry's reference. Safe to call repeatedly.
    *
-   * @param state Stream state; its mutex must be held by the caller.
+   * @param state Stream state; its mutex must be held by the caller, who must also hold a reference to it.
    */
   void speedtest_finish_locked(speedtest_stream_t &state) {
     if (state.finished) {
@@ -1473,59 +1485,89 @@ namespace nvhttp {
     state.finished = true;
     state.slot.reset();
     state.timer.cancel();
+    std::lock_guard registry_lock {speedtest_registry.mutex};
+    std::erase_if(speedtest_registry.streams, [&state](const auto &stream) {
+      return stream.get() == &state;
+    });
   }
 
   /**
-   * @brief Queue chunked-encoded data until speedtest_queue_depth chunks are pending, or finish the stream.
-   * @details Chunks are framed manually (hex size, CRLF, data, CRLF) and the stream ends with the terminating
-   * `0` chunk once the deadline passes or shutdown is requested and the queue has drained. A failed write
-   * (client gone, or connection closed by the stall timer) ends the stream at debug level.
+   * @brief Finish every running speed test, releasing its slot, and close its connection.
+   * @details Called when the HTTPS server stops: Simple-Web-Server may then drop queued send callbacks without
+   * calling them, so the streams would otherwise never finish.
+   */
+  void speedtest_finish_all() {
+    std::vector<std::shared_ptr<speedtest_stream_t>> streams;
+    {
+      std::lock_guard registry_lock {speedtest_registry.mutex};
+      streams.swap(speedtest_registry.streams);
+    }
+    for (const auto &stream : streams) {
+      bool was_running = false;
+      {
+        std::lock_guard lock {stream->mutex};
+        was_running = !stream->finished;
+        speedtest_finish_locked(*stream);
+      }
+      if (was_running) {
+        BOOST_LOG(debug) << "Speed test stopped: server shutting down"sv;
+        stream->close_connection();
+      }
+    }
+  }
+
+  /**
+   * @brief Queue chunked-encoded data until speedtest::queue_depth chunks are pending, or finish the stream.
+   * @details Chunks are framed manually (hex size, CRLF, data, CRLF). No block is queued once the deadline is
+   * reached or the queued blocks would not drain before it at the measured rate, or once shutdown is requested;
+   * the terminating `0` chunk follows when the queue has drained. A failed write (client gone, or connection closed
+   * by the stall timer) ends the stream at debug level.
    *
-   * @param state Stream state shared with the pending callbacks.
+   * @param state Stream state; the caller holds a reference to it.
    */
   void speedtest_pump(const std::shared_ptr<speedtest_stream_t> &state) {
     std::lock_guard lock {state->mutex};
     try {
       while (!state->finished && !state->final_sent) {
-        std::string head;
-        std::span<const char> data;
-        bool last = false;
-
-        if (std::chrono::steady_clock::now() >= state->deadline || mail::man->event<bool>(mail::shutdown)->peek()) {
-          if (state->in_flight > 0) {
-            return;  // the completion of the last pending chunk queues the terminator
-          }
-          last = true;
-          state->final_sent = true;
-          head = "0\r\n\r\n";
-        } else if (state->in_flight >= speedtest_queue_depth) {
-          return;
-        } else {
-          data = speedtest::block(state->sent_blocks++);
-          head = std::format("{:x}\r\n", data.size());
+        const auto now = std::chrono::steady_clock::now();
+        const auto drain = speedtest::drain_time((state->in_flight + 1) * speedtest::block_size, state->completed_bytes, now - state->start);
+        const auto step = speedtest::next_step(now, state->deadline, state->in_flight, drain, mail::man->event<bool>(mail::shutdown)->peek());
+        if (step == speedtest::step_e::wait) {
+          return;  // the completion of a pending chunk pumps again
         }
 
-        state->response->write(head.data(), static_cast<std::streamsize>(head.size()));
-        if (!last) {
+        const bool last = step == speedtest::step_e::finish;
+        if (last) {
+          state->final_sent = true;
+          state->response->write(speedtest::last_chunk.data(), static_cast<std::streamsize>(speedtest::last_chunk.size()));
+        } else {
+          const auto data = speedtest::block(state->sent_blocks++);
+          const auto head = speedtest::chunk_header(data.size());
+          state->response->write(head.data(), static_cast<std::streamsize>(head.size()));
           state->response->write(data.data(), static_cast<std::streamsize>(data.size()));
-          state->response->write("\r\n", 2);
+          state->response->write(speedtest::chunk_trailer.data(), static_cast<std::streamsize>(speedtest::chunk_trailer.size()));
         }
         ++state->in_flight;
-        state->response->send([state, last](const SimpleWeb::error_code &ec) {
+        state->response->send([weak_state = std::weak_ptr {state}, last](const SimpleWeb::error_code &ec) {
+          const auto locked = weak_state.lock();
+          if (!locked) {
+            return;  // already finished and released
+          }
           {
-            std::lock_guard cb_lock {state->mutex};
-            --state->in_flight;
+            std::lock_guard cb_lock {locked->mutex};
+            --locked->in_flight;
             if (ec) {
               BOOST_LOG(debug) << "Speed test stopped: client disconnected or cancelled ("sv << ec.message() << ')';
-              speedtest_finish_locked(*state);
+              speedtest_finish_locked(*locked);
               return;
             }
             if (last) {
-              speedtest_finish_locked(*state);
+              speedtest_finish_locked(*locked);
               return;
             }
+            locked->completed_bytes += speedtest::block_size;
           }
-          speedtest_pump(state);
+          speedtest_pump(locked);
         });
       }
     } catch (const std::exception &e) {
@@ -1538,9 +1580,9 @@ namespace nvhttp {
   /**
    * @brief Stream pseudorandom data to measure the connection's throughput.
    * @details Replies 400 for an invalid `seconds`, 409 while a streaming session is active and 429 while another
-   * speed test runs. Otherwise the body is a `Transfer-Encoding: chunked` stream of 64 KiB blocks for `seconds`
-   * seconds. A timer closes the connection two seconds after the deadline if writes stall, so the slot is never
-   * held longer than that.
+   * speed test runs. Otherwise the body is a `Transfer-Encoding: chunked` stream of 64 KiB blocks for about
+   * `seconds` seconds. A timer closes the connection speedtest::stall_grace after the deadline if the stream has
+   * not finished by then, so the slot is never held longer than that.
    *
    * @param response HTTP response object to populate.
    * @param request HTTP request data from the client.
@@ -1561,12 +1603,15 @@ namespace nvhttp {
 
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds {admission.seconds};
     auto state = std::make_shared<speedtest_stream_t>(io_context, response, std::move(admission.slot), std::move(close_connection), deadline);
+    {
+      std::lock_guard registry_lock {speedtest_registry.mutex};
+      speedtest_registry.streams.push_back(state);
+    }
 
     {
       std::lock_guard lock {state->mutex};
-      state->timer.expires_at(deadline + speedtest_grace);
-      std::weak_ptr<speedtest_stream_t> weak_state {state};
-      state->timer.async_wait([weak_state](const boost::system::error_code &ec) {
+      state->timer.expires_at(speedtest::cutoff_time(deadline));
+      state->timer.async_wait([weak_state = std::weak_ptr {state}](const boost::system::error_code &ec) {
         if (ec) {
           return;  // cancelled: the stream ended normally
         }
@@ -2019,6 +2064,8 @@ namespace nvhttp {
 
     https_server.stop();
     http_server.stop();
+    // Queued send callbacks may be dropped by the stop; finish the speed tests so their slot is released.
+    speedtest_finish_all();
 
     ssl.join();
     tcp.join();

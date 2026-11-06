@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <atomic>
 #include <charconv>
+#include <cstdint>
+#include <format>
 #include <random>
 #include <vector>
 
@@ -56,6 +58,29 @@ namespace speedtest {
   std::span<const char> block(std::size_t index) {
     const auto offset = (index * block_size) % pool_size;
     return std::span<const char> {pool()}.subspan(offset, block_size);
+  }
+
+  std::string chunk_header(std::size_t size) {
+    return std::format("{:x}\r\n", size);
+  }
+
+  std::chrono::nanoseconds drain_time(std::size_t queued_bytes, std::size_t completed_bytes, std::chrono::nanoseconds elapsed) {
+    if (completed_bytes == 0 || elapsed <= std::chrono::nanoseconds::zero()) {
+      return std::chrono::nanoseconds::zero();
+    }
+    // Bytes are bounded by a few blocks and elapsed by about twenty seconds, so the product fits in 64 bits.
+    return std::chrono::nanoseconds {static_cast<std::chrono::nanoseconds::rep>(queued_bytes * static_cast<std::uint64_t>(elapsed.count()) / completed_bytes)};
+  }
+
+  step_e next_step(std::chrono::steady_clock::time_point now, std::chrono::steady_clock::time_point deadline, std::size_t in_flight, std::chrono::nanoseconds drain, bool stopping) {
+    if (stopping || now + drain >= deadline) {
+      return in_flight > 0 ? step_e::wait : step_e::finish;
+    }
+    return in_flight >= queue_depth ? step_e::wait : step_e::send_block;
+  }
+
+  std::chrono::steady_clock::time_point cutoff_time(std::chrono::steady_clock::time_point deadline) {
+    return deadline + stall_grace;
   }
 
   admission_t admit(std::string_view seconds_value, int active_sessions) {

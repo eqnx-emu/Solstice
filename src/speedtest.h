@@ -5,9 +5,11 @@
 #pragma once
 
 // standard includes
+#include <chrono>
 #include <cstddef>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 
 namespace speedtest {
@@ -15,6 +17,59 @@ namespace speedtest {
   constexpr std::size_t pool_size = 1024 * 1024;  ///< Size in bytes of the shared pseudorandom buffer.
   constexpr int min_seconds = 1;  ///< Shortest accepted test duration, in seconds.
   constexpr int max_seconds = 10;  ///< Longest accepted test duration, in seconds.
+  constexpr std::size_t queue_depth = 3;  ///< Blocks kept queued ahead so a single round trip does not cap throughput.
+  constexpr std::chrono::seconds stall_grace {10};  ///< Time past the deadline that queued blocks and the terminator get before a stalled stream is cut off.
+  constexpr std::string_view chunk_trailer {"\r\n"};  ///< Bytes that close the data of a chunk.
+  constexpr std::string_view last_chunk {"0\r\n\r\n"};  ///< Terminating zero-size chunk with an empty trailer section.
+
+  /**
+   * @brief Next action of the speed test stream.
+   */
+  enum class step_e {
+    send_block,  ///< Queue another data block.
+    wait,  ///< Wait for a queued chunk to complete.
+    finish  ///< Queue the terminating chunk.
+  };
+
+  /**
+   * @brief Format the size line that starts a chunk of `Transfer-Encoding: chunked`.
+   *
+   * @param size Number of data bytes in the chunk.
+   * @return The size in lowercase hexadecimal followed by CRLF.
+   */
+  std::string chunk_header(std::size_t size);
+
+  /**
+   * @brief Estimate how long sending some bytes takes at the rate measured so far.
+   *
+   * @param queued_bytes Bytes that still have to be sent.
+   * @param completed_bytes Bytes whose send has completed since the stream started.
+   * @param elapsed Time since the stream started.
+   * @return The estimate, or zero while no rate has been measured.
+   */
+  std::chrono::nanoseconds drain_time(std::size_t queued_bytes, std::size_t completed_bytes, std::chrono::nanoseconds elapsed);
+
+  /**
+   * @brief Decide what the stream does next.
+   * @details No block is queued once the deadline is reached or would be passed before the queued blocks and the
+   * new one drain (`drain`), or while stopping. The terminator is queued once nothing is in flight anymore.
+   *
+   * @param now Current time.
+   * @param deadline Time at which the test ends.
+   * @param in_flight Chunks queued whose send has not completed.
+   * @param drain Estimated time to send the queued blocks plus one more (see drain_time()).
+   * @param stopping Whether the server is shutting down.
+   * @return The next step.
+   */
+  step_e next_step(std::chrono::steady_clock::time_point now, std::chrono::steady_clock::time_point deadline, std::size_t in_flight, std::chrono::nanoseconds drain, bool stopping);
+
+  /**
+   * @brief Get the time at which a stream that has not finished is cut off.
+   *
+   * @param deadline Time at which the test ends.
+   * @return The deadline plus stall_grace.
+   */
+  std::chrono::steady_clock::time_point cutoff_time(std::chrono::steady_clock::time_point deadline);
 
   /**
    * @brief Parse and validate the `seconds` query value.
