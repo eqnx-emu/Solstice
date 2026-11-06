@@ -1,10 +1,8 @@
 <div align="center">
-  <img
-    src="sunshine.svg"
-    alt="Solstice icon"
-    width="200"
-/>
-  <h1 align="center">Solstice</h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="branding/solstice_logo_dark.png">
+    <img alt="Solstice" src="branding/solstice_logo_light.png" width="420">
+  </picture>
   <h4 align="center">A Windows-focused fork of <a href="https://github.com/LizardByte/Sunshine">Sunshine</a>, tuned for streaming to a Nintendo Switch.</h4>
 </div>
 
@@ -18,7 +16,8 @@
 
 Solstice is a personal fork of [Sunshine](https://github.com/LizardByte/Sunshine), the self-hosted game stream host
 for Moonlight. It keeps everything Sunshine does and adds features aimed at one setup: a Windows PC with an NVIDIA GPU
-streaming to [Moonlight-Switch](https://github.com/luizfbalves/Moonlight-Switch).
+streaming to [Equinox](https://github.com/luizfbalves/Equinox), its companion client for the Nintendo Switch.
+Both apps share the same half sun, half moon logo.
 
 It follows upstream Sunshine and is not affiliated with or endorsed by LizardByte. For everything that is not listed
 below, the [Sunshine documentation](https://docs.lizardbyte.dev/projects/sunshine) applies.
@@ -36,8 +35,8 @@ below, the [Sunshine documentation](https://docs.lizardbyte.dev/projects/sunshin
 ### 🕹️ Gamepad type per game
 
 * Each application can choose its emulated gamepad: global setting, automatic, Switch, Xbox 360 or DualShock 4.
-* With the global setting on `auto`, the client decides: the **Switch** layout in Moonlight-Switch gets a Switch
-  controller, the Xbox layouts get an Xbox 360 controller.
+* With the global setting on `auto`, the client decides: the **Switch** layout in Equinox or Moonlight-Switch gets a
+  Switch controller, the Xbox layouts get an Xbox 360 controller.
 
 ### 🖥️ Streaming
 
@@ -70,7 +69,7 @@ below, the [Sunshine documentation](https://docs.lizardbyte.dev/projects/sunshin
 3. In the web UI, go to **Configuration → Input** and set:
    * **Gamepad driver**: `viiper`
    * **Emulated gamepad type**: `auto`
-4. On the Switch, use [Moonlight-Switch](https://github.com/luizfbalves/Moonlight-Switch) 1.5.3 or newer and pick
+4. On the Switch, use [Equinox](https://github.com/luizfbalves/Equinox) (or Moonlight-Switch 1.5.3 or newer) and pick
    the **Switch** key mapping layout.
 
 > [!TIP]
@@ -92,6 +91,10 @@ Releases are built by the [Windows workflow](.github/workflows/fork-windows.yml)
 locally, follow the [Sunshine build guide](docs/building.md)
 with MSYS2 UCRT64, and pass `-DSUNSHINE_VIIPER_DLL=<path to libVIIPER.dll>` to bundle libVIIPER in the package.
 
+The logo and every icon (app, tray states, web UI, macOS, store art) are generated from
+[`art/logo/solstice.svg`](art/logo/solstice.svg). After changing the shapes, run `python art/logo/render_logo.py`
+(needs Pillow) to regenerate them.
+
 ## 🙏 Credits
 
 Solstice exists thanks to the work of others:
@@ -104,7 +107,9 @@ Solstice exists thanks to the work of others:
   controller visible to Windows.
 * **[ViGEmBus](https://github.com/nefarius/ViGEmBus)** by Nefarius: the Xbox and DualShock 4 fallback.
 * **[Moonlight](https://moonlight-stream.org)** and **[Moonlight-Switch](https://github.com/XITRIX/Moonlight-Switch)**
-  by XITRIX: the clients on the other end.
+  by XITRIX: the clients on the other end, and the base of [Equinox](https://github.com/luizfbalves/Equinox).
+* **[Onest](https://github.com/googlefonts/onest)**: the typeface of the Solstice wordmark, under the
+  [SIL Open Font License](art/logo/onest_OFL.txt).
 
 ### Sunshine contributors
 
