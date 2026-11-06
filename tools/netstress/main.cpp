@@ -19,6 +19,7 @@
 // clang-format off
 #include <windows.h>  // must precede shellapi.h
 #include <shellapi.h>
+#include <timeapi.h>
 // clang-format on
 
 namespace {
@@ -45,6 +46,22 @@ namespace {
       LocalFree(argv);
     }
     return fps;
+  }
+
+  /**
+   * @brief Opt in to per-monitor DPI awareness so the window is never bitmap-scaled (which would smooth the noise).
+   * @details Uses per-monitor v2 when available and falls back to system DPI awareness.
+   */
+  void enable_dpi_awareness() {
+    HMODULE user32 = GetModuleHandleW(L"user32.dll");
+    using set_context_fn = BOOL(WINAPI *)(HANDLE);
+    if (auto set_context = reinterpret_cast<set_context_fn>(reinterpret_cast<void *>(GetProcAddress(user32, "SetProcessDpiAwarenessContext")))) {
+      const auto per_monitor_aware_v2 = reinterpret_cast<HANDLE>(static_cast<INT_PTR>(-4));
+      if (set_context(per_monitor_aware_v2)) {
+        return;
+      }
+    }
+    SetProcessDPIAware();
   }
 
   bool running = true;  ///< Cleared when the window should exit.
@@ -85,7 +102,9 @@ namespace {
  */
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
   const int fps = parse_fps();
-  const int width = GetSystemMetrics(SM_CXSCREEN);  // primary display
+  enable_dpi_awareness();  // before any metrics are read
+  // Primary display: when the virtual display is in use, display_device makes it the primary one.
+  const int width = GetSystemMetrics(SM_CXSCREEN);
   const int height = GetSystemMetrics(SM_CYSCREEN);
 
   WNDCLASSW wc {};
@@ -118,7 +137,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
   if (!dib || !bits) {
     return 1;
   }
-  SelectObject(memory_dc, dib);
+  HGDIOBJ previous_bitmap = SelectObject(memory_dc, dib);
+  SetForegroundWindow(hwnd);
 
   auto *pixels = static_cast<std::uint64_t *>(bits);
   const std::size_t pair_count = static_cast<std::size_t>(width) * height / 2;
@@ -133,6 +153,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
   const auto frame_time = std::chrono::nanoseconds {1'000'000'000LL / fps};
   auto next_frame = std::chrono::steady_clock::now();
 
+  timeBeginPeriod(1);  // 1 ms timer resolution so sleep_until can hold high --fps values
   while (running) {
     MSG msg;
     while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -166,9 +187,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
       y += 2 * dy;
     }
     RECT rect {x, y, x + square, y + square};
-    HBRUSH brush = CreateSolidBrush(RGB(255, 255, 255));
-    FillRect(memory_dc, &rect, brush);
-    DeleteObject(brush);
+    FillRect(memory_dc, &rect, static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
 
     BitBlt(window_dc, 0, 0, width, height, memory_dc, 0, 0, SRCCOPY);
 
@@ -181,7 +200,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     }
   }
 
+  timeEndPeriod(1);
   ShowCursor(TRUE);
+  SelectObject(memory_dc, previous_bitmap);
   DeleteObject(dib);
   DeleteDC(memory_dc);
   ReleaseDC(hwnd, window_dc);

@@ -938,8 +938,15 @@ namespace proc {
         // Synthetic app for the client's connection test; it only exists here, never in apps.json.
         proc::ctx_t ctx;
         ctx.name = std::string {network_test_app_name};
-        ctx.cmd = "\"" + netstress.string() + "\"";
+#ifdef _WIN32
+        // ctx.cmd is UTF-8 everywhere else (apps.json); convert the native wide path the same way.
+        const auto netstress_utf8 = utf_utils::to_utf8(netstress.wstring());
+        ctx.working_dir = utf_utils::to_utf8(netstress.parent_path().wstring());
+#else
+        const auto netstress_utf8 = netstress.string();
         ctx.working_dir = netstress.parent_path().string();
+#endif
+        ctx.cmd = "\"" + netstress_utf8 + "\"";
         ctx.elevated = false;
         ctx.auto_detach = false;
         ctx.wait_all = true;

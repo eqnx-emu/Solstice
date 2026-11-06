@@ -53,6 +53,7 @@ add_executable(solstice-netstress WIN32 netstress/main.cpp)
 target_link_libraries(solstice-netstress
         user32
         gdi32
-        shell32)
+        shell32
+        winmm)
 target_compile_options(solstice-netstress PRIVATE ${SUNSHINE_COMPILE_OPTIONS})
 target_link_options(solstice-netstress PRIVATE -municode)

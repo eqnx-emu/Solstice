@@ -11,13 +11,16 @@
 #include <chrono>
 #include <filesystem>
 #include <format>
+#include <map>
 #include <mutex>
+#include <span>
 #include <string>
 #include <utility>
 
 // lib includes
 #include <boost/asio/ssl/context.hpp>
 #include <boost/asio/ssl/context_base.hpp>
+#include <boost/asio/steady_timer.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
@@ -84,10 +87,54 @@ namespace nvhttp {
       context.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
     }
 
+    /**
+     * @brief Get a function that forcibly closes the connection a request arrived on.
+     * @details Simple-Web-Server does not expose the connection to resource handlers, so connections are
+     * remembered by remote endpoint when their TLS handshake completes. Closing makes pending writes fail.
+     *
+     * @param request Request whose connection should be closable.
+     * @return Closer that does nothing if the connection is gone.
+     */
+    std::function<void()> connection_closer(const std::shared_ptr<Request> &request) {
+      std::weak_ptr<Connection> connection;
+      {
+        std::lock_guard lock {connections_mutex};
+        if (auto it = connections.find(request->remote_endpoint()); it != connections.end()) {
+          connection = it->second;
+        }
+      }
+      return [connection]() {
+        if (auto locked = connection.lock()) {
+          locked->close();
+        }
+      };
+    }
+
     std::function<int(SSL *)> verify;  ///< Callback that validates a client's TLS certificate after handshake.
     std::function<void(std::shared_ptr<Response>, std::shared_ptr<Request>)> on_verify_failed;  ///< Handler used to return the pairing challenge when client verification fails.
 
   protected:
+    std::mutex connections_mutex;  ///< Guards connections.
+    std::map<boost::asio::ip::tcp::endpoint, std::weak_ptr<Connection>> connections;  ///< Live connections by remote endpoint, for connection_closer().
+
+    /**
+     * @brief Remember a connection by its remote endpoint, dropping entries for closed connections.
+     *
+     * @param connection Connection whose handshake completed.
+     */
+    void remember_connection(const std::shared_ptr<Connection> &connection) {
+      boost::system::error_code ec;
+      const auto endpoint = connection->socket->lowest_layer().remote_endpoint(ec);
+      if (ec) {
+        return;
+      }
+      std::lock_guard lock {connections_mutex};
+      std::erase_if(connections, [](const auto &entry) {
+        return entry.second.expired();
+      });
+      connections[endpoint] = connection;
+    }
+
     boost::asio::ssl::context context {boost::asio::ssl::context::tls_server};  ///< TLS server context configured with Sunshine's certificate and protocol policy.
 
     /**
@@ -113,6 +160,7 @@ namespace nvhttp {
      */
     void handle_handshake(const std::shared_ptr<Session> &session, const SimpleWeb::error_code &ec) {
       if (!ec) {
+        remember_connection(session->connection);
         if (verify && !verify(session->connection->socket->native_handle())) {
           this->write(session, on_verify_failed);
         } else {
@@ -1375,69 +1423,170 @@ namespace nvhttp {
     response->write(SimpleWeb::StatusCode::success_ok, "", SimpleWeb::CaseInsensitiveMultimap {{"Cache-Control", "no-store"}});
   }
 
+  constexpr std::size_t speedtest_queue_depth = 3;  ///< Blocks kept queued ahead so a single round trip does not cap throughput.
+  constexpr std::chrono::seconds speedtest_grace {2};  ///< Extra time past the deadline before a stalled stream is cut off.
+
   /**
-   * @brief State of one in-flight speed test download, kept alive by the pending send callback.
+   * @brief State of one in-flight speed test download, kept alive by pending callbacks.
+   * @details All members are guarded by `mutex`. The slot is released exactly once by speedtest_finish_locked(),
+   * whichever of normal completion, write error, deadline timer or exception happens first.
    */
   struct speedtest_stream_t {
-    resp_https_t response;  ///< Response being streamed; closing it ends the download.
-    speedtest::slot_t slot;  ///< Concurrency slot, released when the stream state is destroyed on any exit path.
-    std::chrono::steady_clock::time_point deadline;  ///< Time at which the stream stops.
-    std::size_t sent_blocks = 0;  ///< Number of blocks queued so far.
+    /**
+     * @brief Create the stream state.
+     *
+     * @param io Event loop that drives the stall timer.
+     * @param response_ Response being streamed.
+     * @param slot_ Held concurrency slot.
+     * @param close_connection_ Closes the connection, failing pending writes.
+     * @param deadline_ Time at which new blocks stop being queued.
+     */
+    speedtest_stream_t(boost::asio::io_context &io, resp_https_t response_, speedtest::slot_t slot_, std::function<void()> close_connection_, std::chrono::steady_clock::time_point deadline_):
+        response {std::move(response_)},
+        slot {std::move(slot_)},
+        close_connection {std::move(close_connection_)},
+        timer {io},
+        deadline {deadline_} {
+    }
+
+    std::mutex mutex;  ///< Guards every member below.
+    resp_https_t response;  ///< Response being streamed.
+    speedtest::slot_t slot;  ///< Concurrency slot; released by speedtest_finish_locked().
+    std::function<void()> close_connection;  ///< Forcibly closes the connection, failing pending writes.
+    boost::asio::steady_timer timer;  ///< Cuts the stream off if writes stall past the deadline plus grace.
+    std::chrono::steady_clock::time_point deadline;  ///< Time at which new blocks stop being queued.
+    std::size_t sent_blocks = 0;  ///< Number of data blocks queued so far.
+    std::size_t in_flight = 0;  ///< Chunks queued whose send has not completed.
+    bool final_sent = false;  ///< Whether the terminating chunk has been queued.
+    bool finished = false;  ///< Whether the stream already ended and released its resources.
   };
 
   /**
-   * @brief Queue the next speed test block, or finish the stream.
-   * @details Each block is sent asynchronously; the next one is queued from the completion callback, so no
-   * thread is blocked and the stream stops as soon as the deadline passes, shutdown is requested, or a write
-   * fails (the client disconnected or cancelled). When the last reference to the state is dropped the slot is
-   * released and the connection is closed.
+   * @brief End the stream: release the slot and stop the timer. Safe to call repeatedly.
    *
-   * @param state Stream state shared with the pending callback.
+   * @param state Stream state; its mutex must be held by the caller.
    */
-  void speedtest_send_next(const std::shared_ptr<speedtest_stream_t> &state) {
-    if (std::chrono::steady_clock::now() >= state->deadline || mail::man->event<bool>(mail::shutdown)->peek()) {
+  void speedtest_finish_locked(speedtest_stream_t &state) {
+    if (state.finished) {
       return;
     }
+    state.finished = true;
+    state.slot.reset();
+    state.timer.cancel();
+  }
 
-    const auto chunk = speedtest::block(state->sent_blocks++);
-    state->response->write(chunk.data(), static_cast<std::streamsize>(chunk.size()));
-    state->response->send([state](const SimpleWeb::error_code &ec) {
-      if (ec) {
-        BOOST_LOG(debug) << "Speed test stopped: client disconnected or cancelled ("sv << ec.message() << ')';
-        return;
+  /**
+   * @brief Queue chunked-encoded data until speedtest_queue_depth chunks are pending, or finish the stream.
+   * @details Chunks are framed manually (hex size, CRLF, data, CRLF) and the stream ends with the terminating
+   * `0` chunk once the deadline passes or shutdown is requested and the queue has drained. A failed write
+   * (client gone, or connection closed by the stall timer) ends the stream at debug level.
+   *
+   * @param state Stream state shared with the pending callbacks.
+   */
+  void speedtest_pump(const std::shared_ptr<speedtest_stream_t> &state) {
+    std::lock_guard lock {state->mutex};
+    try {
+      while (!state->finished && !state->final_sent) {
+        std::string head;
+        std::span<const char> data;
+        bool last = false;
+
+        if (std::chrono::steady_clock::now() >= state->deadline || mail::man->event<bool>(mail::shutdown)->peek()) {
+          if (state->in_flight > 0) {
+            return;  // the completion of the last pending chunk queues the terminator
+          }
+          last = true;
+          state->final_sent = true;
+          head = "0\r\n\r\n";
+        } else if (state->in_flight >= speedtest_queue_depth) {
+          return;
+        } else {
+          data = speedtest::block(state->sent_blocks++);
+          head = std::format("{:x}\r\n", data.size());
+        }
+
+        state->response->write(head.data(), static_cast<std::streamsize>(head.size()));
+        if (!last) {
+          state->response->write(data.data(), static_cast<std::streamsize>(data.size()));
+          state->response->write("\r\n", 2);
+        }
+        ++state->in_flight;
+        state->response->send([state, last](const SimpleWeb::error_code &ec) {
+          {
+            std::lock_guard cb_lock {state->mutex};
+            --state->in_flight;
+            if (ec) {
+              BOOST_LOG(debug) << "Speed test stopped: client disconnected or cancelled ("sv << ec.message() << ')';
+              speedtest_finish_locked(*state);
+              return;
+            }
+            if (last) {
+              speedtest_finish_locked(*state);
+              return;
+            }
+          }
+          speedtest_pump(state);
+        });
       }
-      speedtest_send_next(state);
-    });
+    } catch (const std::exception &e) {
+      BOOST_LOG(debug) << "Speed test aborted: "sv << e.what();
+      speedtest_finish_locked(*state);
+      state->close_connection();
+    }
   }
 
   /**
    * @brief Stream pseudorandom data to measure the connection's throughput.
    * @details Replies 400 for an invalid `seconds`, 409 while a streaming session is active and 429 while another
-   * speed test runs. Otherwise the body is a close-delimited stream of 64 KiB blocks for `seconds` seconds.
+   * speed test runs. Otherwise the body is a `Transfer-Encoding: chunked` stream of 64 KiB blocks for `seconds`
+   * seconds. A timer closes the connection two seconds after the deadline if writes stall, so the slot is never
+   * held longer than that.
    *
    * @param response HTTP response object to populate.
    * @param request HTTP request data from the client.
+   * @param io_context Event loop used for the stall timer.
+   * @param close_connection Closes the request's connection.
    */
-  void solstice_speedtest(resp_https_t response, req_https_t request) {
+  void solstice_speedtest(resp_https_t response, req_https_t request, boost::asio::io_context &io_context, std::function<void()> close_connection) {
     print_req<SunshineHTTPS>(request);
 
     const auto args = request->parse_query_string();
     const auto seconds_it = args.find("seconds"s);
+    // The streaming-session (409) check happens only here, at admission; a session started mid-test is not detected.
     auto admission = speedtest::admit(seconds_it == std::end(args) ? ""sv : std::string_view {seconds_it->second}, rtsp_stream::session_count());
     if (admission.status != 200) {
       response->write(static_cast<SimpleWeb::StatusCode>(admission.status), "", SimpleWeb::CaseInsensitiveMultimap {{"Cache-Control", "no-store"}});
       return;
     }
 
-    auto state = std::make_shared<speedtest_stream_t>();
-    state->response = response;
-    state->slot = std::move(admission.slot);
-    state->deadline = std::chrono::steady_clock::now() + std::chrono::seconds {admission.seconds};
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds {admission.seconds};
+    auto state = std::make_shared<speedtest_stream_t>(io_context, response, std::move(admission.slot), std::move(close_connection), deadline);
 
-    // No Content-Length: the body is delimited by closing the connection once the state is released.
-    response->close_connection_after_response = true;
-    response->write(SimpleWeb::StatusCode::success_ok, SimpleWeb::CaseInsensitiveMultimap {{"Content-Type", "application/octet-stream"}, {"Cache-Control", "no-store"}, {"Connection", "close"}});
-    speedtest_send_next(state);
+    {
+      std::lock_guard lock {state->mutex};
+      state->timer.expires_at(deadline + speedtest_grace);
+      std::weak_ptr<speedtest_stream_t> weak_state {state};
+      state->timer.async_wait([weak_state](const boost::system::error_code &ec) {
+        if (ec) {
+          return;  // cancelled: the stream ended normally
+        }
+        if (auto locked = weak_state.lock()) {
+          bool cut_off = false;
+          {
+            std::lock_guard timer_lock {locked->mutex};
+            cut_off = !locked->finished;
+            speedtest_finish_locked(*locked);
+          }
+          if (cut_off) {
+            BOOST_LOG(debug) << "Speed test cut off: writes stalled past the deadline"sv;
+            locked->close_connection();
+          }
+        }
+      });
+    }
+
+    response->write(SimpleWeb::StatusCode::success_ok, SimpleWeb::CaseInsensitiveMultimap {{"Content-Type", "application/octet-stream"}, {"Cache-Control", "no-store"}, {"Transfer-Encoding", "chunked"}});
+    speedtest_pump(state);
   }
 
   /**
@@ -1836,7 +1985,9 @@ namespace nvhttp {
     };
     https_server.resource["^/cancel$"]["GET"] = cancel;
     https_server.resource["^/solstice/ping$"]["GET"] = solstice_ping;
-    https_server.resource["^/solstice/speedtest$"]["GET"] = solstice_speedtest;
+    https_server.resource["^/solstice/speedtest$"]["GET"] = [&https_server](auto resp, auto req) {
+      solstice_speedtest(resp, req, *https_server.io_service, https_server.connection_closer(req));
+    };
 
     https_server.config.reuse_address = true;
     https_server.config.address = net::get_bind_address(address_family);
