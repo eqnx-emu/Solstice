@@ -3,6 +3,7 @@
  * @brief Definitions for the virtual display session lifecycle.
  */
 // standard includes
+#include <atomic>
 #include <charconv>
 #include <chrono>
 #include <condition_variable>
@@ -86,8 +87,11 @@ namespace virtual_display {
       std::thread worker;  ///< Teardown worker thread, started on first use.
 #ifdef SUNSHINE_TESTS
       bool test_hold_worker {false};  ///< Keeps the worker from picking up requests, unless it is asked to stop.
+      bool test_fail_worker_start {false};  ///< Makes starting the teardown worker throw, as on thread exhaustion.
 #endif
     } STATE;
+
+    std::atomic<int> configuring_count {0};  ///< Number of `begin()` calls in progress; read by `configuring()` without `STATE.mutex`.
 
     /**
      * @brief Get a printable name of a driver status.
@@ -273,6 +277,10 @@ namespace virtual_display {
         session.enable_sops = enable_sops;
       })};
       const auto enable_hdr {std::exchange(session.enable_hdr, false)};
+      // Accepted trade-off: this runs on the single nvhttp HTTPS thread and blocks every other HTTPS request until the
+      // apply succeeds (one mode set) or the retry window ends (about 3 s plus the last attempt, then revert and
+      // remove). Knowing the result is what lets begin() fall back to the physical display. Speed tests are refused
+      // while configuring() is true, so that a test does not measure this stall.
       if (!display_device::configure_display_now(video_config, session, STATE.apply_window)) {
         session.enable_hdr = enable_hdr;
         return false;
@@ -369,15 +377,29 @@ namespace virtual_display {
         end_unlocked();
         return;
       }
-      STATE.teardown_requested = true;
       if (!STATE.worker_running) {
         if (STATE.worker.joinable()) {
           // The previous worker has left its loop and released the lock, so joining it cannot block on us.
           STATE.worker.join();
         }
-        STATE.worker_running = true;
-        STATE.worker = std::thread {teardown_worker_main};
+        try {
+#ifdef SUNSHINE_TESTS
+          if (STATE.test_fail_worker_start) {
+            throw std::system_error {std::make_error_code(std::errc::resource_unavailable_try_again), "test"};
+          }
+#endif
+          // The new thread blocks on STATE.mutex, held here, so it cannot exit before the flag is set.
+          STATE.worker = std::thread {teardown_worker_main};
+          STATE.worker_running = true;
+        } catch (const std::system_error &e) {
+          // Running the teardown inline would put the revert and the driver call back under the join() watchdog and
+          // the rtsp lock. Instead end_pending stays set: the next begin() or shutdown() runs it, and the next
+          // dispatch tries to start the worker again.
+          BOOST_LOG(error) << "Could not start the virtual display teardown thread, deferring the teardown: "sv << e.what();
+          return;
+        }
       }
+      STATE.teardown_requested = true;
       STATE.teardown_cv.notify_all();
     }
 
@@ -527,6 +549,11 @@ namespace virtual_display {
   }
 
   bool begin(rtsp_stream::launch_session_t &session, std::string_view app_value, const start_e start) {
+    // Counted before taking the lock, so a begin() waiting behind a teardown is reported as well.
+    ++configuring_count;
+    const auto done_configuring {util::fail_guard([]() {
+      --configuring_count;
+    })};
     std::lock_guard lock {STATE.mutex};
     if (STATE.end_pending && STATE.sessions == 0) {
       // The worker has not run the deferred teardown yet; run it now so it cannot remove the display set up below.
@@ -658,6 +685,10 @@ namespace virtual_display {
     return STATE.active;
   }
 
+  bool configuring() {
+    return configuring_count.load() > 0;
+  }
+
 #ifdef SUNSHINE_TESTS
   void test_install_backend(std::unique_ptr<backend_t> backend) {
     stop_worker(false);
@@ -676,6 +707,7 @@ namespace virtual_display {
     STATE.teardown_requested = false;
     STATE.shut_down = false;
     STATE.test_hold_worker = false;
+    STATE.test_fail_worker_start = false;
   }
 
   void test_init(std::unique_ptr<backend_t> backend, const std::filesystem::path &state_file) {
@@ -698,6 +730,11 @@ namespace virtual_display {
   int test_session_count() {
     std::lock_guard lock {STATE.mutex};
     return STATE.sessions;
+  }
+
+  void test_fail_worker_start(const bool fail) {
+    std::lock_guard lock {STATE.mutex};
+    STATE.test_fail_worker_start = fail;
   }
 
   void test_hold_teardown_worker(const bool hold) {

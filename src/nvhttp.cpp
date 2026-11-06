@@ -1595,7 +1595,7 @@ namespace nvhttp {
     const auto args = request->parse_query_string();
     const auto seconds_it = args.find("seconds"s);
     // The streaming-session (409) check happens only here, at admission; a session started mid-test is not detected.
-    auto admission = speedtest::admit(seconds_it == std::end(args) ? ""sv : std::string_view {seconds_it->second}, rtsp_stream::session_count());
+    auto admission = speedtest::admit(seconds_it == std::end(args) ? ""sv : std::string_view {seconds_it->second}, rtsp_stream::session_count(), virtual_display::configuring());
     if (admission.status != 200) {
       response->write(static_cast<SimpleWeb::StatusCode>(admission.status), "", SimpleWeb::CaseInsensitiveMultimap {{"Cache-Control", "no-store"}});
       return;

@@ -85,6 +85,18 @@ TEST(Speedtest, AdmitRejectsWhileStreaming) {
   speedtest::release();
 }
 
+TEST(Speedtest, AdmitRejectsWhileVirtualDisplayIsConfiguring) {
+  const auto result = speedtest::admit("5", 0, true);
+  EXPECT_EQ(result.status, 409);
+  EXPECT_FALSE(result.slot.owns());
+  EXPECT_TRUE(speedtest::try_acquire());
+  speedtest::release();
+}
+
+TEST(Speedtest, AdmitChecksSecondsBeforeConfiguringDisplay) {
+  EXPECT_EQ(speedtest::admit("0", 0, true).status, 400);
+}
+
 TEST(Speedtest, AdmitAllowsOneAtATimeAndReleasesTheSlot) {
   {
     auto first = speedtest::admit("3", 0);

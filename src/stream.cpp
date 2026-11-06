@@ -2388,8 +2388,13 @@ namespace stream {
 
       // Keeps the virtual display alive while the capture threads run; balanced by session_stopped() in join().
       virtual_display::session_started();
+      // A session whose threads fail to start never reaches join(), so balance the count here.
+      auto unbalanced_session {util::fail_guard([]() {
+        virtual_display::session_stopped();
+      })};
       session.audioThread = std::jthread {audioThread, &session};
       session.videoThread = std::jthread {videoThread, &session};
+      unbalanced_session.disable();
 
       session.state.store(state_e::RUNNING, std::memory_order_relaxed);
 

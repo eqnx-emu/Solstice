@@ -182,11 +182,13 @@ namespace speedtest {
 
   /**
    * @brief Decide whether a speed test request may run.
-   * @details Checks are made in order: duration (400), active streaming session (409), concurrency (429).
+   * @details Checks are made in order: duration (400), active streaming session or display configuration in
+   * progress (409), concurrency (429).
    *
    * @param seconds_value Raw `seconds` query value.
    * @param active_sessions Number of active streaming sessions.
+   * @param display_configuring Whether a virtual display is being set up, which stalls the HTTPS thread.
    * @return The decision, holding the slot when the status is 200.
    */
-  admission_t admit(std::string_view seconds_value, int active_sessions);
+  admission_t admit(std::string_view seconds_value, int active_sessions, bool display_configuring = false);
 }  // namespace speedtest

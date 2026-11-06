@@ -156,6 +156,9 @@ namespace virtual_display_test {
 
     [[nodiscard]] ApplyResult applySettings(const display_device::SingleDisplayConfiguration &config) override {
       log->add("apply");
+      if (on_apply) {
+        on_apply();
+      }
       std::lock_guard lock {mutex};
       applied.push_back(config);
       if (apply_failures != 0) {
@@ -206,6 +209,7 @@ namespace virtual_display_test {
     std::atomic<RevertResult> revert_result {RevertResult::Ok};  ///< Result returned by `revertSettings`.
     std::atomic<std::thread::id> revert_thread {};  ///< Thread that ran the last `revertSettings`.
     std::function<void()> on_revert;  ///< Called by `revertSettings` when set, e.g. to block it; set before use.
+    std::function<void()> on_apply;  ///< Called by `applySettings` when set, e.g. to observe state mid-apply; set before use.
 
   private:
     std::shared_ptr<call_log_t> log;  ///< Shared call log.

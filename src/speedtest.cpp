@@ -83,12 +83,12 @@ namespace speedtest {
     return deadline + stall_grace;
   }
 
-  admission_t admit(std::string_view seconds_value, int active_sessions) {
+  admission_t admit(std::string_view seconds_value, int active_sessions, bool display_configuring) {
     admission_t result;
     const auto seconds = parse_seconds(seconds_value);
     if (!seconds) {
       result.status = 400;
-    } else if (active_sessions > 0) {
+    } else if (active_sessions > 0 || display_configuring) {
       result.status = 409;
     } else if (!try_acquire()) {
       result.status = 429;

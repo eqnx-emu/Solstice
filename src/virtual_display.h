@@ -152,6 +152,13 @@ namespace virtual_display {
    */
   bool active();
 
+  /**
+   * @brief Report whether a `begin()` is in progress, including one waiting for the lock.
+   * @details Lock-free, so it is cheap and never waits for a running configuration.
+   * @return `true` while a virtual display is being created or configured.
+   */
+  bool configuring();
+
 #ifdef SUNSHINE_TESTS
   /**
    * @brief Replace the backend and drop any active session state.
@@ -191,5 +198,11 @@ namespace virtual_display {
    * @param hold True to hold the worker, false to release it.
    */
   void test_hold_teardown_worker(bool hold);
+
+  /**
+   * @brief Make starting the teardown worker thread throw `std::system_error`, as on thread exhaustion.
+   * @param fail True to make the start fail, false to restore normal behaviour.
+   */
+  void test_fail_worker_start(bool fail);
 #endif
 }  // namespace virtual_display

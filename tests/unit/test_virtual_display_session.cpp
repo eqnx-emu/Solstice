@@ -858,3 +858,80 @@ TEST_F(VirtualDisplay, EndOrRevertRevertsPhysicalDisplayEvenWhenKeeping) {
 
   EXPECT_EQ(log->snapshot(), (std::vector<std::string> {"revert"}));
 }
+
+TEST_F(VirtualDisplay, ReportsConfiguringOnlyDuringBegin) {
+  bool configuring_during_apply {false};
+  settings->on_apply = [&configuring_during_apply]() {
+    configuring_during_apply = virtual_display::configuring();
+  };
+  EXPECT_FALSE(virtual_display::configuring());
+
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+
+  EXPECT_TRUE(configuring_during_apply);
+  EXPECT_FALSE(virtual_display::configuring());
+}
+
+TEST_F(VirtualDisplay, StopsReportingConfiguringWhenBeginFallsBack) {
+  virtual_display::test_set_apply_window(0ms);
+  settings->fail_applies(-1);
+  auto session {make_session(1280, 720, 60)};
+
+  EXPECT_FALSE(virtual_display::begin(*session, "", launch));
+
+  EXPECT_FALSE(virtual_display::configuring());
+  settings->fail_applies(0);
+}
+
+TEST_F(VirtualDisplay, FailedWorkerStartLeavesTeardownPendingForBegin) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+  virtual_display::session_started();
+  virtual_display::end();
+  virtual_display::test_fail_worker_start(true);
+
+  EXPECT_NO_THROW(virtual_display::session_stopped());
+  virtual_display::test_wait_for_teardown();  // returns at once: no request is left behind for a missing worker
+  EXPECT_TRUE(virtual_display::active());
+
+  virtual_display::test_fail_worker_start(false);
+  auto next {make_session(1920, 1080, 120)};
+  ASSERT_TRUE(virtual_display::begin(*next, "", launch));
+  ASSERT_EQ(backend->creates.size(), 2);
+  EXPECT_EQ(backend->creates[1].mode.width, 1920);
+  EXPECT_TRUE(happens_after(log->snapshot(), "revert", "remove"));
+}
+
+TEST_F(VirtualDisplay, FailedWorkerStartLeavesTeardownPendingForShutdown) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+  virtual_display::session_started();
+  virtual_display::end();
+  virtual_display::test_fail_worker_start(true);
+  virtual_display::session_stopped();
+  ASSERT_TRUE(virtual_display::active());
+
+  virtual_display::shutdown();
+
+  EXPECT_FALSE(virtual_display::active());
+  EXPECT_EQ(config::video.output_name, physical_device_id);
+}
+
+TEST_F(VirtualDisplay, WorkerStartIsRetriedOnNextDispatch) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+  virtual_display::session_started();
+  virtual_display::end();
+  virtual_display::test_fail_worker_start(true);
+  virtual_display::session_stopped();
+  ASSERT_TRUE(virtual_display::active());
+
+  virtual_display::test_fail_worker_start(false);
+  virtual_display::session_started();
+  virtual_display::session_stopped();
+  virtual_display::test_wait_for_teardown();
+
+  EXPECT_FALSE(virtual_display::active());
+  EXPECT_NE(settings->revert_thread.load(), std::this_thread::get_id());
+}
