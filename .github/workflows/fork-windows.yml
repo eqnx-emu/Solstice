@@ -19,6 +19,14 @@ env:
   PYTHON_VERSION: '3.14'
   VIIPER_VERSION: 'v0.9.0'
   VIIPER_SHA256: '341180d887a6d04f2b42a5d10c7743a9c84125272d99dfe5cf76a2a15ca1167c'
+  # TODO(virtual-display): SudoMaker/SudoVDA publishes no GitHub releases, so there is no official SudoVDA.dll asset.
+  # Replace these placeholders with a real tag, asset URL and checksum (build from source or a trusted mirror).
+  # The bundled sudovda.cat only validates the DLL it was signed with, so the DLL must match DriverVer 1.10.9.289.
+  SUDOVDA_VERSION: 'PLACEHOLDER-NO-OFFICIAL-RELEASE'
+  SUDOVDA_URL: 'https://example.invalid/PLACEHOLDER/SudoVDA.dll'
+  SUDOVDA_SHA256: '0000000000000000000000000000000000000000000000000000000000000000'
+  NEFCON_VERSION: 'v1.21.0'
+  NEFCON_SHA256: '4c8e68f6b663598d77b7c3f76459b16fad00994e53ea8af0bd106a805dd5c18b'
 
 jobs:
   windows:
@@ -95,6 +103,21 @@ jobs:
           test -n "${dll}"
           echo "VIIPER_DLL=$(cygpath -m "${dll}")" >> "$GITHUB_ENV"
 
+      - name: Download SudoVDA driver binaries
+        run: |
+          set -euo pipefail
+          dest="src_assets/windows/drivers/sudovda"
+          curl -fsSL -o SudoVDA.dll "${SUDOVDA_URL}"
+          echo "${SUDOVDA_SHA256}  SudoVDA.dll" | sha256sum -c -
+          curl -fsSL -o nefcon.zip \
+            "https://github.com/nefarius/nefcon/releases/download/${NEFCON_VERSION}/nefcon_${NEFCON_VERSION}.zip"
+          echo "${NEFCON_SHA256}  nefcon.zip" | sha256sum -c -
+          mkdir -p nefcon
+          unzip -o nefcon.zip -d nefcon
+          test -f nefcon/x64/nefconc.exe
+          cp SudoVDA.dll "${dest}/SudoVDA.dll"
+          cp nefcon/x64/nefconc.exe "${dest}/nefconc.exe"
+
       - name: Version
         run: |
           version="$(date -u +%Y).$(date -u +%-m%d).$(date -u +%H%M%S)"
@@ -118,7 +141,8 @@ jobs:
             -DSUNSHINE_PUBLISHER_NAME="${GITHUB_REPOSITORY_OWNER}" \
             -DSUNSHINE_PUBLISHER_WEBSITE="https://github.com/${GITHUB_REPOSITORY}" \
             -DSUNSHINE_PUBLISHER_ISSUE_URL="https://github.com/${GITHUB_REPOSITORY}/issues" \
-            -DSUNSHINE_VIIPER_DLL="${VIIPER_DLL}"
+            -DSUNSHINE_VIIPER_DLL="${VIIPER_DLL}" \
+            -DSUNSHINE_BUNDLE_SUDOVDA=ON
           ninja -C build
 
       - name: Test
@@ -152,5 +176,5 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "Sunshine ${BUILD_VERSION} (fork)" \
-            --notes "Windows build of ${GITHUB_SHA} with libVIIPER ${VIIPER_VERSION} bundled." \
+            --notes "Windows build of ${GITHUB_SHA} with libVIIPER ${VIIPER_VERSION} and the SudoVDA driver bundled." \
             --latest

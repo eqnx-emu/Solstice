@@ -276,6 +276,35 @@ $script:LogPath = $LogPath
 
 . (Join-Path $ScriptDir "sunshine-setup-process.ps1")
 
+# Run a SudoVDA driver script. Failure is logged and never fails the Sunshine setup,
+# because the virtual display feature falls back to the physical display without the driver.
+function Invoke-SudoVdaScript {
+    param(
+        [string]$ScriptName,
+        [string]$Description
+    )
+
+    $scriptPath = Join-Path $RootDir "drivers\sudovda\$ScriptName"
+    $powershellExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell1.0\powershell.exe"
+    if (-not (Test-Path -LiteralPath $scriptPath)) {
+        Write-LogMessage -Message "$Description" -Level "Step"
+        Write-LogMessage -Message "  ⓘ Skipped (SudoVDA driver not bundled)" -Level "Information" -Color "DarkGray"
+        return
+    }
+    try {
+        $null = Invoke-ExecutableIfExist `
+            -ExecutablePath $powershellExe `
+            -Arguments "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" `
+            -Description $Description `
+            -Emoji "🖥️" `
+            -ExecutableName "SudoVDA $ScriptName" `
+            -MissingTarget "powershell.exe" `
+            -FailureTarget $scriptPath
+    } catch {
+        Write-LogMessage -Message "  ⚠ SudoVDA step failed: $($_.Exception.Message)" -Level "Warning"
+    }
+}
+
 # Main script logic
 Write-Information ""
 
@@ -286,7 +315,7 @@ if ($Action -eq "install") {
         -Color "Yellow"
     Write-Information ""
 
-    $totalSteps = 6
+    $totalSteps = 7
     $currentStep = 0
 
     # Reset permissions on the install directory
@@ -422,6 +451,15 @@ if ($Action -eq "install") {
         -Emoji "🚀"
     Write-Information ""
 
+    # 6. Install the virtual display driver (optional, failures are only logged)
+    $currentStep++
+    Write-Progress `
+        -Activity "Installing Sunshine" `
+        -Status "Installing virtual display driver" `
+        -PercentComplete (($currentStep / $totalSteps) * 100)
+    Invoke-SudoVdaScript -ScriptName "install.ps1" -Description "Installing virtual display driver (SudoVDA)"
+    Write-Information ""
+
     Write-Progress -Activity "Installing Sunshine" -Completed
     Write-FramedText -Message "✓ Sunshine installation completed successfully!" -Level "Success"
 
@@ -448,8 +486,17 @@ if ($Action -eq "install") {
         -Color "Yellow"
     Write-Information ""
 
-    $totalSteps = 4
+    $totalSteps = 5
     $currentStep = 0
+
+    # 0. Remove the virtual display driver (failures are only logged)
+    $currentStep++
+    Write-Progress `
+        -Activity "Uninstalling Sunshine" `
+        -Status "Removing virtual display driver" `
+        -PercentComplete (($currentStep / $totalSteps) * 100)
+    Invoke-SudoVdaScript -ScriptName "uninstall.ps1" -Description "Removing virtual display driver (SudoVDA)"
+    Write-Information ""
 
     # 1. Delete firewall rules
     $currentStep++

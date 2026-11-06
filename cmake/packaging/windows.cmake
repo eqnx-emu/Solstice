@@ -23,6 +23,32 @@ if(SUNSHINE_VIIPER_DLL)
     endif()
 endif()
 
+# Bundle the SudoVDA virtual display driver (OFF by default, the fork workflow turns it ON). install.ps1 runs from sunshine-setup.ps1 (NSIS and WiX).
+option(SUNSHINE_BUNDLE_SUDOVDA "Bundle the SudoVDA virtual display driver (needs SudoVDA.dll and nefconc.exe)" OFF)
+set(SUNSHINE_SUDOVDA_DIR "${SUNSHINE_SOURCE_ASSETS_DIR}/windows/drivers/sudovda")
+if(SUNSHINE_BUNDLE_SUDOVDA)
+    foreach(_sudovda_file SudoVDA.dll nefconc.exe)
+        if(NOT EXISTS "${SUNSHINE_SUDOVDA_DIR}/${_sudovda_file}")
+            message(FATAL_ERROR
+                    "SUNSHINE_BUNDLE_SUDOVDA is ON but ${_sudovda_file} is missing from ${SUNSHINE_SUDOVDA_DIR}. "
+                    "Download it (see .github/workflows/fork-windows.yml) or configure with "
+                    "-DSUNSHINE_BUNDLE_SUDOVDA=OFF.")
+        endif()
+    endforeach()
+    install(DIRECTORY "${SUNSHINE_SUDOVDA_DIR}/"
+            DESTINATION "drivers/sudovda"
+            COMPONENT application
+            FILES_MATCHING
+            PATTERN "SudoVDA.dll"
+            PATTERN "SudoVDA.inf"
+            PATTERN "sudovda.cat"
+            PATTERN "sudovda.cer"
+            PATTERN "nefconc.exe"
+            PATTERN "install.ps1"
+            PATTERN "uninstall.ps1"
+            PATTERN "LICENSE")
+endif()
+
 # Adding tools
 install(TARGETS dxgi-info RUNTIME DESTINATION "tools" COMPONENT dxgi)
 install(TARGETS audio-info RUNTIME DESTINATION "tools" COMPONENT audio)

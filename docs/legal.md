@@ -28,3 +28,8 @@ The virtual display backend uses the SudoVDA driver interface headers (`third-pa
 [SudoMaker](https://github.com/SudoMaker/SudoVDA) and taken from the
 [Apollo](https://github.com/ClassicOldSong/Apollo) project (GPL-3.0). The backend in
 `src/platform/windows/virtual_display.cpp` is adapted from Apollo's SudoVDA integration.
+
+The Windows package also bundles the SudoVDA driver binaries (`drivers/sudovda`). SudoVDA is based on the Microsoft
+IndirectDisplay sample and is licensed by its author under "MIT and CC0 or Public Domain ... choose the least
+restrictive option" (its repository ships no separate license file; see `src_assets/windows/drivers/sudovda/LICENSE`).
+The driver is installed with [nefcon](https://github.com/nefarius/nefcon) (`nefconc.exe`, MIT License).
