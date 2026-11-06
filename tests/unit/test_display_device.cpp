@@ -778,3 +778,58 @@ TEST(DisplayDeviceMapDisplayName, ReturnsInputWhenPlatformIsUnsupported) {
 
   EXPECT_EQ(display_device::map_display_name(R"(\.\DISPLAY9)"), R"(\.\DISPLAY9)");
 }
+
+TEST(DisplayDeviceConfigureNow, AppliesInTheCallingThread) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+  const auto persistence {display_device::test_make_watched_persistence()};
+  display_device::test_install_settings_manager(std::make_unique<redock_settings_manager_t>(persistence), persistence);
+  config::video_t video_config {};
+  video_config.dd.configuration_option = config_option_e::ensure_primary;
+  video_config.output_name = "panel";
+
+  EXPECT_TRUE(display_device::configure_display_now(video_config, {}, 1s));
+  EXPECT_FALSE(display_device::test_revert_retry_is_scheduled());
+}
+
+TEST(DisplayDeviceConfigureNow, ReplacesScheduledRevertRetries) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+  display_device::test_set_retry_interval(30ms);
+  const auto persistence {display_device::test_make_watched_persistence()};
+  display_device::test_install_settings_manager(std::make_unique<redock_settings_manager_t>(persistence), persistence);
+  display_device::revert_configuration();
+  ASSERT_TRUE(display_device::test_revert_retry_is_scheduled());
+  config::video_t video_config {};
+  video_config.dd.configuration_option = config_option_e::ensure_primary;
+  video_config.output_name = "panel";
+
+  EXPECT_TRUE(display_device::configure_display_now(video_config, {}, 1s));
+  EXPECT_FALSE(display_device::test_revert_retry_is_scheduled());
+}
+
+TEST(DisplayDeviceConfigureNow, FailsWhenConfigurationIsDisabled) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+  config::video_t video_config {};
+  video_config.dd.configuration_option = config_option_e::disabled;
+
+  EXPECT_FALSE(display_device::configure_display_now(video_config, {}, 1s));
+}
+
+TEST(DisplayDeviceConfigureNow, FailsWhenConfigurationCannotBeParsed) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+  config::video_t video_config {};
+  video_config.dd.configuration_option = config_option_e::ensure_primary;
+  video_config.dd.resolution_option = resolution_option_e::manual;
+  video_config.dd.manual_resolution = "not-a-resolution";
+  rtsp_stream::launch_session_t session {};
+  session.enable_sops = true;
+
+  EXPECT_FALSE(display_device::configure_display_now(video_config, session, 1s));
+}
+
+TEST(DisplayDeviceConfigureNow, SucceedsWhenPlatformIsUnsupported) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+  config::video_t video_config {};
+  video_config.dd.configuration_option = config_option_e::ensure_primary;
+
+  EXPECT_TRUE(display_device::configure_display_now(video_config, {}, 1s));
+}

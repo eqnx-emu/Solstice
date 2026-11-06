@@ -163,8 +163,12 @@ namespace proc {
     std::string get_running_app_gamepad() const;
     /**
      * @brief Terminate the launched application process.
+     *
+     * When an app had run, the display is restored with `virtual_display::end_or_revert()`.
+     *
+     * @return True when the display was restored, false when no app had run.
      */
-    void terminate();
+    bool terminate();
 
     /**
      * @brief Update the cached app list and environment without disturbing running process state.

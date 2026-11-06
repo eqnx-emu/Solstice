@@ -84,6 +84,10 @@ namespace platf::vdisplay {
 
     /**
      * @brief Open the driver, verify its protocol and start the watchdog ping thread.
+     *
+     * When the watchdog cannot be queried, the handle is closed again and `watchdog_failed` is reported,
+     * because the driver would remove unpinged monitors.
+     *
      * @return The resulting driver status.
      */
     driver_status_e open() override;

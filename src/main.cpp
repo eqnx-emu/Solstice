@@ -297,7 +297,7 @@ int main(int argc, char *argv[]) {
     BOOST_LOG(error) << "Display device session failed to initialize"sv;
   }
 
-  // Opens the virtual display driver and cleans up after a crash; never fails startup, sessions fall back to the physical display.
+  // Cleans up a virtual display left by a crash (opening the driver only then, otherwise on first use); never fails startup.
   // Runs after display_device::init so a display configuration persisted by a crash can be reverted against the re-created display.
   virtual_display::init(platf::appdata() / "virtual_display.state");
 
@@ -565,6 +565,9 @@ int main(int argc, char *argv[]) {
   httpThread.join();
   configThread.join();
   rtspThread.join();
+
+  // The stream sessions are gone: run a virtual display teardown that is still pending before shutting down.
+  virtual_display::shutdown();
 
   task_pool.stop();
   task_pool.join();

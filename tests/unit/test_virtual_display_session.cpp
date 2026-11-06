@@ -10,13 +10,20 @@
 
 // standard includes
 #include <algorithm>
+#include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <iterator>
+#include <string>
+#include <thread>
+#include <vector>
 
 namespace {
   using enum virtual_display::start_e;
+  using namespace std::chrono_literals;
   using virtual_display_test::config_option_e;
   using virtual_display_test::device_prep_t;
   using virtual_display_test::expected_guid;
@@ -426,7 +433,7 @@ TEST_F(VirtualDisplay, GlobalDisabledOverridesAppEnabled) {
 TEST_F(VirtualDisplay, EndDefersTeardownWhileStreaming) {
   auto session {make_session(1280, 720, 60)};
   ASSERT_TRUE(virtual_display::begin(*session, "", launch));
-  virtual_display::streaming_started();
+  virtual_display::session_started();
 
   // E.g. the app exits mid-stream and terminate() runs on the control thread while capture is still running.
   virtual_display::end();
@@ -436,7 +443,8 @@ TEST_F(VirtualDisplay, EndDefersTeardownWhileStreaming) {
   EXPECT_EQ(backend->removed.size(), 1);
   EXPECT_EQ(std::ranges::count(log->snapshot(), "revert"), 0);
 
-  virtual_display::streaming_stopped();
+  virtual_display::session_stopped();
+  virtual_display::test_wait_for_teardown();
 
   EXPECT_FALSE(virtual_display::active());
   EXPECT_EQ(config::video.output_name, physical_device_id);
@@ -444,12 +452,13 @@ TEST_F(VirtualDisplay, EndDefersTeardownWhileStreaming) {
   EXPECT_TRUE(happens_after(log->snapshot(), "revert", "remove"));
 }
 
-TEST_F(VirtualDisplay, StreamingStoppedWithoutPendingEndKeepsDisplay) {
+TEST_F(VirtualDisplay, SessionStoppedWithoutPendingEndKeepsDisplay) {
   auto session {make_session(1280, 720, 60)};
   ASSERT_TRUE(virtual_display::begin(*session, "", launch));
-  virtual_display::streaming_started();
+  virtual_display::session_started();
 
-  virtual_display::streaming_stopped();
+  virtual_display::session_stopped();
+  virtual_display::test_wait_for_teardown();
 
   EXPECT_TRUE(virtual_display::active());
   EXPECT_EQ(config::video.output_name, virtual_device_id);
@@ -517,4 +526,335 @@ TEST_F(VirtualDisplay, InitDropsMalformedCrashRecord) {
 
   EXPECT_EQ(log->snapshot(), (std::vector<std::string> {"open"}));
   EXPECT_FALSE(std::filesystem::exists(state_file));
+}
+
+TEST_F(VirtualDisplay, UpgradesEnsureActiveToEnsurePrimary) {
+  // ensure_active only activates the display, so the game would still open on the physical primary display.
+  config::video.dd.configuration_option = config_option_e::ensure_active;
+  auto session {make_session(1280, 720, 60)};
+
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+
+  const auto applied {settings->applied_configs()};
+  ASSERT_EQ(applied.size(), 1);
+  EXPECT_EQ(applied[0].m_device_prep, device_prep_t::EnsurePrimary);
+  EXPECT_EQ(config::video.dd.configuration_option, config_option_e::ensure_active);
+}
+
+TEST_F(VirtualDisplay, KeepsEnsurePrimary) {
+  config::video.dd.configuration_option = config_option_e::ensure_primary;
+  auto session {make_session(1280, 720, 60)};
+
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+
+  const auto applied {settings->applied_configs()};
+  ASSERT_EQ(applied.size(), 1);
+  EXPECT_EQ(applied[0].m_device_prep, device_prep_t::EnsurePrimary);
+}
+
+TEST_F(VirtualDisplay, BeginRetriesConfigurationUntilApplied) {
+  display_device::test_set_retry_interval(1ms);
+  settings->fail_applies(2);
+  auto session {make_session(1280, 720, 60)};
+
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+
+  EXPECT_EQ(std::ranges::count(log->snapshot(), "apply"), 3);
+  EXPECT_TRUE(virtual_display::active());
+  EXPECT_EQ(config::video.output_name, virtual_device_id);
+  EXPECT_FALSE(session->enable_hdr);
+}
+
+TEST_F(VirtualDisplay, BeginFallsBackWhenConfigurationKeepsFailing) {
+  auto fake {std::make_unique<virtual_display_test::fake_backend_t>(log, virtual_display::driver_status_e::ok, std::string {virtual_gdi_name})};
+  const auto *installed {fake.get()};
+  virtual_display::test_init(std::move(fake), state_file);
+  display_device::test_set_retry_interval(1ms);
+  virtual_display::test_set_apply_window(20ms);
+  settings->fail_applies(-1);
+  auto session {make_session(1280, 720, 60)};
+
+  EXPECT_FALSE(virtual_display::begin(*session, "", launch));
+
+  const auto calls {log->snapshot()};
+  EXPECT_GE(std::ranges::count(calls, "apply"), 2);
+  // Torn down as in end(): revert while the display exists, then remove it.
+  EXPECT_TRUE(happens_after(calls, "apply", "revert"));
+  EXPECT_TRUE(happens_after(calls, "revert", "remove"));
+  EXPECT_FALSE(virtual_display::active());
+  EXPECT_EQ(config::video.output_name, physical_device_id);
+  EXPECT_TRUE(session->enable_hdr);
+  EXPECT_FALSE(std::filesystem::exists(state_file));
+  EXPECT_TRUE(log_checker::line_contains("test_sunshine.log", "Could not configure the new virtual display"));
+
+  // The app now runs on the physical display, so a resume must not create a virtual display.
+  settings->fail_applies(0);
+  auto resumed {make_session(1280, 720, 60)};
+  EXPECT_FALSE(virtual_display::begin(*resumed, "", resume));
+  EXPECT_EQ(installed->creates.size(), 1);
+}
+
+TEST_F(VirtualDisplay, ResumeFallsBackWhenConfigurationFails) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+  display_device::test_set_retry_interval(1ms);
+  virtual_display::test_set_apply_window(5ms);
+  settings->fail_applies(-1);
+
+  auto resumed {make_session(1920, 1080, 60)};
+  EXPECT_FALSE(virtual_display::begin(*resumed, "", resume));
+
+  EXPECT_FALSE(virtual_display::active());
+  EXPECT_EQ(config::video.output_name, physical_device_id);
+  EXPECT_TRUE(resumed->enable_hdr);
+  EXPECT_EQ(backend->removed.size(), 2);
+  EXPECT_TRUE(log_checker::line_contains("test_sunshine.log", "Could not configure the virtual display"));
+
+  settings->fail_applies(0);
+  auto again {make_session(1920, 1080, 60)};
+  EXPECT_FALSE(virtual_display::begin(*again, "", resume));
+  EXPECT_EQ(backend->creates.size(), 1);
+}
+
+TEST_F(VirtualDisplay, InitDefersDriverOpenWithoutCrashRecord) {
+  auto fake {std::make_unique<virtual_display_test::fake_backend_t>(log, virtual_display::driver_status_e::unknown, std::string {virtual_gdi_name})};
+  fake->open_status = virtual_display::driver_status_e::ok;
+  virtual_display::test_init(std::move(fake), state_file);
+
+  EXPECT_TRUE(log->snapshot().empty());
+
+  // A session that does not want a virtual display does not open the driver either.
+  auto physical {make_session(1280, 720, 60)};
+  EXPECT_FALSE(virtual_display::begin(*physical, "disabled", launch));
+  EXPECT_TRUE(log->snapshot().empty());
+
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+  const auto calls {log->snapshot()};
+  ASSERT_FALSE(calls.empty());
+  EXPECT_EQ(calls[0], "open");
+  EXPECT_TRUE(happens_after(calls, "open", "create"));
+}
+
+TEST_F(VirtualDisplay, DeferredTeardownRunsOffTheCallerThread) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+  virtual_display::session_started();
+  virtual_display::end();
+
+  virtual_display::session_stopped();
+  virtual_display::test_wait_for_teardown();
+
+  EXPECT_FALSE(virtual_display::active());
+  EXPECT_NE(settings->revert_thread.load(), std::this_thread::get_id());
+  EXPECT_TRUE(happens_after(log->snapshot(), "revert", "remove"));
+  EXPECT_EQ(config::video.output_name, physical_device_id);
+}
+
+TEST_F(VirtualDisplay, SessionStartingWhileAnotherStopsKeepsDisplay) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+  virtual_display::session_started();
+  virtual_display::end();
+
+  // A second session starts before the first one has finished stopping.
+  virtual_display::session_started();
+  virtual_display::session_stopped();
+  virtual_display::test_wait_for_teardown();
+
+  EXPECT_EQ(virtual_display::test_session_count(), 1);
+  EXPECT_TRUE(virtual_display::active());
+  EXPECT_EQ(config::video.output_name, virtual_device_id);
+  EXPECT_EQ(std::ranges::count(log->snapshot(), "revert"), 0);
+
+  virtual_display::session_stopped();
+  virtual_display::test_wait_for_teardown();
+
+  EXPECT_EQ(virtual_display::test_session_count(), 0);
+  EXPECT_FALSE(virtual_display::active());
+  EXPECT_EQ(config::video.output_name, physical_device_id);
+}
+
+TEST_F(VirtualDisplay, SessionCountDoesNotDependOnStartStopOrder) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+  virtual_display::session_started();
+
+  // The old session stops just before the new one starts; the display is never torn down under the new session.
+  virtual_display::session_stopped();
+  virtual_display::session_started();
+  virtual_display::end();
+  virtual_display::test_wait_for_teardown();
+
+  EXPECT_EQ(virtual_display::test_session_count(), 1);
+  EXPECT_TRUE(virtual_display::active());
+
+  virtual_display::session_stopped();
+  virtual_display::test_wait_for_teardown();
+  EXPECT_FALSE(virtual_display::active());
+}
+
+TEST_F(VirtualDisplay, UnbalancedSessionStopIsIgnored) {
+  virtual_display::session_stopped();
+
+  EXPECT_EQ(virtual_display::test_session_count(), 0);
+  EXPECT_TRUE(log_checker::line_contains("test_sunshine.log", "Virtual display session count is unbalanced"));
+}
+
+TEST_F(VirtualDisplay, BeginRunsPendingTeardownBeforeCreating) {
+  auto first {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*first, "", launch));
+  virtual_display::session_started();
+  virtual_display::end();
+  virtual_display::test_hold_teardown_worker(true);
+  virtual_display::session_stopped();
+  log->calls.clear();
+
+  // The worker has not run the teardown yet when the next launch arrives.
+  auto second {make_session(1920, 1080, 60)};
+  ASSERT_TRUE(virtual_display::begin(*second, "", launch));
+
+  EXPECT_EQ(log->snapshot(), (std::vector<std::string> {"revert", "remove", "remove", "create", "apply"}));
+
+  // The released worker finds nothing left to do.
+  virtual_display::test_hold_teardown_worker(false);
+  virtual_display::test_wait_for_teardown();
+  EXPECT_TRUE(virtual_display::active());
+  EXPECT_EQ(config::video.output_name, virtual_device_id);
+  EXPECT_EQ(std::ranges::count(log->snapshot(), "revert"), 1);
+}
+
+TEST_F(VirtualDisplay, BeginWaitsForRunningTeardown) {
+  auto first {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*first, "", launch));
+
+  std::promise<void> entered;
+  std::promise<void> release;
+  const auto release_future {release.get_future().share()};
+  settings->on_revert = [&entered, release_future, done = false]() mutable {
+    if (!done) {
+      done = true;
+      entered.set_value();
+      release_future.wait();
+    }
+  };
+
+  virtual_display::session_started();
+  virtual_display::end();
+  virtual_display::session_stopped();
+  entered.get_future().wait();  // the worker is inside the teardown and holds the lock
+
+  auto second {make_session(1920, 1080, 60)};
+  std::atomic_bool second_result {false};
+  std::thread launcher {[&second, &second_result]() {
+    second_result = virtual_display::begin(*second, "", launch);
+  }};
+  release.set_value();
+  launcher.join();
+
+  EXPECT_TRUE(second_result);
+  const auto calls {log->snapshot()};
+  // First the teardown (revert, remove), then the new display (remove leftover, create, apply).
+  const std::vector<std::string> tail {"revert", "remove", "remove", "create", "apply"};
+  ASSERT_GE(calls.size(), tail.size());
+  EXPECT_TRUE(std::equal(tail.begin(), tail.end(), calls.end() - static_cast<std::ptrdiff_t>(tail.size())));
+  EXPECT_TRUE(virtual_display::active());
+  ASSERT_EQ(backend->creates.size(), 2);
+  EXPECT_EQ(backend->creates[1].mode.width, 1920);
+}
+
+TEST_F(VirtualDisplay, ShutdownRunsPendingTeardown) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+  virtual_display::session_started();
+  virtual_display::end();
+  virtual_display::test_hold_teardown_worker(true);
+  virtual_display::session_stopped();
+  EXPECT_TRUE(virtual_display::active());
+
+  virtual_display::shutdown();
+
+  EXPECT_FALSE(virtual_display::active());
+  EXPECT_EQ(config::video.output_name, physical_device_id);
+  EXPECT_TRUE(happens_after(log->snapshot(), "revert", "remove"));
+}
+
+TEST_F(VirtualDisplay, TeardownAfterShutdownRunsInline) {
+  virtual_display::shutdown();
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+  virtual_display::session_started();
+  virtual_display::end();
+
+  virtual_display::session_stopped();
+
+  EXPECT_FALSE(virtual_display::active());
+  EXPECT_EQ(settings->revert_thread.load(), std::this_thread::get_id());
+}
+
+TEST_F(VirtualDisplay, ShutdownWithoutPendingTeardownKeepsDisplay) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+
+  virtual_display::shutdown();
+
+  EXPECT_TRUE(virtual_display::active());
+}
+
+TEST_F(VirtualDisplay, EndOrRevertEndsActiveDisplay) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+
+  virtual_display::end_or_revert();
+
+  EXPECT_FALSE(virtual_display::active());
+  EXPECT_EQ(config::video.output_name, physical_device_id);
+  EXPECT_TRUE(happens_after(log->snapshot(), "revert", "remove"));
+  EXPECT_FALSE(display_device::test_revert_retry_is_scheduled());
+}
+
+TEST_F(VirtualDisplay, EndOrRevertKeepsActiveDisplayWhenAsked) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+
+  virtual_display::end_or_revert(true);
+
+  EXPECT_TRUE(virtual_display::active());
+  EXPECT_EQ(std::ranges::count(log->snapshot(), "revert"), 0);
+
+  // The app was launched on the virtual display and still runs, so a resume reuses it.
+  auto resumed {make_session(1280, 720, 60)};
+  EXPECT_TRUE(virtual_display::begin(*resumed, "", resume));
+  EXPECT_EQ(backend->creates.size(), 1);
+}
+
+TEST_F(VirtualDisplay, EndOrRevertDefersWhileSessionRuns) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+  virtual_display::session_started();
+
+  virtual_display::end_or_revert();
+
+  EXPECT_TRUE(virtual_display::active());
+  virtual_display::session_stopped();
+  virtual_display::test_wait_for_teardown();
+  EXPECT_FALSE(virtual_display::active());
+}
+
+TEST_F(VirtualDisplay, EndOrRevertRevertsPhysicalDisplayWithoutVirtualDisplay) {
+  virtual_display::end_or_revert();
+
+  EXPECT_EQ(log->snapshot(), (std::vector<std::string> {"revert"}));
+  EXPECT_TRUE(backend->removed.empty());
+}
+
+TEST_F(VirtualDisplay, EndOrRevertRevertsPhysicalDisplayEvenWhenKeeping) {
+  install_backend(virtual_display::driver_status_e::ok, std::nullopt);
+  auto launched {make_session(1280, 720, 60)};
+  ASSERT_FALSE(virtual_display::begin(*launched, "", launch));
+  log->calls.clear();
+
+  virtual_display::end_or_revert(true);
+
+  EXPECT_EQ(log->snapshot(), (std::vector<std::string> {"revert"}));
 }

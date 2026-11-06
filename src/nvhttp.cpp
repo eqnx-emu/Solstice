@@ -1613,11 +1613,7 @@ namespace nvhttp {
       response->close_connection_after_response = true;
 
       if (revert_display_configuration) {
-        if (virtual_display::active()) {
-          virtual_display::end();
-        } else {
-          display_device::revert_configuration();
-        }
+        virtual_display::end_or_revert();
       }
     });
 
@@ -1839,15 +1835,10 @@ namespace nvhttp {
 
     rtsp_stream::terminate_sessions();
 
-    if (proc::proc.running() > 0) {
-      proc::proc.terminate();
-    }
-
-    // The config needs to be reverted regardless of whether "proc::proc.terminate()" was called or not.
-    if (virtual_display::active()) {
-      virtual_display::end();
-    } else {
-      display_device::revert_configuration();
+    // The display must be restored whether or not an app was running; terminate() does it when an app had run.
+    const bool restored {proc::proc.running() > 0 && proc::proc.terminate()};
+    if (!restored) {
+      virtual_display::end_or_revert();
     }
   }
 

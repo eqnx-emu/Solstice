@@ -10,11 +10,13 @@
 // standard includes
 #include <atomic>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <system_error>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -156,11 +158,21 @@ namespace virtual_display_test {
       log->add("apply");
       std::lock_guard lock {mutex};
       applied.push_back(config);
+      if (apply_failures != 0) {
+        if (apply_failures > 0) {
+          --apply_failures;
+        }
+        return ApplyResult::DevicePrepFailed;
+      }
       return ApplyResult::Ok;
     }
 
     [[nodiscard]] RevertResult revertSettings() override {
       log->add("revert");
+      revert_thread = std::this_thread::get_id();
+      if (on_revert) {
+        on_revert();
+      }
       const auto result {revert_result.load()};
       if (result == RevertResult::Ok) {
         std::ignore = persistence->clear();
@@ -182,13 +194,25 @@ namespace virtual_display_test {
       return applied;
     }
 
+    /**
+     * @brief Make the next applies fail.
+     * @param count Number of failing applies, or -1 to fail every apply.
+     */
+    void fail_applies(int count) {
+      std::lock_guard lock {mutex};
+      apply_failures = count;
+    }
+
     std::atomic<RevertResult> revert_result {RevertResult::Ok};  ///< Result returned by `revertSettings`.
+    std::atomic<std::thread::id> revert_thread {};  ///< Thread that ran the last `revertSettings`.
+    std::function<void()> on_revert;  ///< Called by `revertSettings` when set, e.g. to block it; set before use.
 
   private:
     std::shared_ptr<call_log_t> log;  ///< Shared call log.
     std::shared_ptr<display_device::SettingsPersistenceInterface> persistence;  ///< Persistence watched by the revert loop.
     std::mutex mutex;  ///< Guards the applied list.
     std::vector<display_device::SingleDisplayConfiguration> applied;  ///< Applied configurations.
+    int apply_failures {0};  ///< Applies still failing, or -1 for all.
   };
 
   /**

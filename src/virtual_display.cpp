@@ -5,6 +5,7 @@
 // standard includes
 #include <charconv>
 #include <chrono>
+#include <condition_variable>
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -14,11 +15,13 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <thread>
 #include <utility>
 
 // local includes
 #include "display_device.h"
 #include "logging.h"
+#include "platform/common.h"
 #include "rtsp.h"
 #include "utility.h"
 #include "virtual_display.h"
@@ -33,6 +36,7 @@ namespace virtual_display {
   namespace {
     constexpr std::size_t max_serial_length {13};  ///< EDID serial field holds 13 characters plus the terminator.
     constexpr auto reopen_interval {10s};  ///< Minimum time between two attempts to re-open an unusable driver.
+    constexpr std::chrono::milliseconds default_apply_window {3s};  ///< How long `begin()` retries applying the display configuration.
 
 #ifndef _WIN32
     /**
@@ -59,7 +63,7 @@ namespace virtual_display {
 #endif
 
     /**
-     * @brief Orchestrator state shared by launch, resume and terminate.
+     * @brief Orchestrator state shared by launch, resume, terminate and the stream sessions.
      */
     struct {
       std::mutex mutex;  ///< Guards every field below.
@@ -69,10 +73,20 @@ namespace virtual_display {
       mode_t mode {};  ///< Mode the active virtual display was created with.
       std::string original_output_name;  ///< `config::video.output_name` before the virtual display took over.
       bool launched_with_display {false};  ///< True when the running app was launched on a virtual display.
-      bool streaming {false};  ///< True while stream sessions (and their capture threads) are running.
-      bool end_pending {false};  ///< True when `end()` was deferred until streaming stops.
+      int sessions {0};  ///< Stream sessions whose capture threads may be running.
+      bool end_pending {false};  ///< True when `end()` was deferred until the last session stops.
       std::optional<std::chrono::steady_clock::time_point> last_reopen;  ///< Time of the last driver re-open attempt.
       std::filesystem::path state_file;  ///< File recording the active virtual display, empty for none.
+      std::chrono::milliseconds apply_window {default_apply_window};  ///< How long `begin()` retries applying the configuration.
+      std::condition_variable teardown_cv;  ///< Wakes the teardown worker and the threads waiting for it.
+      bool teardown_requested {false};  ///< True while a teardown was handed to the worker and has not run yet.
+      bool worker_running {false};  ///< True while the teardown worker thread runs its loop.
+      bool worker_stop {false};  ///< Asks the teardown worker to exit once no teardown is requested.
+      bool shut_down {false};  ///< True after `shutdown()`: teardowns run in the calling thread.
+      std::thread worker;  ///< Teardown worker thread, started on first use.
+#ifdef SUNSHINE_TESTS
+      bool test_hold_worker {false};  ///< Keeps the worker from picking up requests, unless it is asked to stop.
+#endif
     } STATE;
 
     /**
@@ -196,12 +210,13 @@ namespace virtual_display {
     }
 
     /**
-     * @brief Get the driver status, re-opening the driver when it is not usable.
+     * @brief Get the driver status, opening the driver when it is not usable.
      *
-     * The re-open is attempted at most once every `reopen_interval`. It recovers from a driver that was installed
-     * after Sunshine started (fresh install or upgrade) and from a watchdog failure.
+     * The driver is opened here the first time a session needs it (see `init()`). Re-opening is attempted at most
+     * once every `reopen_interval`. It recovers from a driver that was installed after Sunshine started (fresh
+     * install or upgrade) and from a watchdog failure.
      *
-     * @return The driver status after the optional re-open.
+     * @return The driver status after the optional open.
      * @note Must be called with `STATE.mutex` held.
      */
     driver_status_e ensure_driver_unlocked() {
@@ -219,27 +234,36 @@ namespace virtual_display {
       }
       STATE.last_reopen = now;
 
-      BOOST_LOG(info) << "Virtual display driver status is "sv << status_name(status) << ", re-opening the driver."sv;
+      BOOST_LOG(info) << "Virtual display driver status is "sv << status_name(status) << ", opening the driver."sv;
       const auto reopened {open_backend_unlocked()};
       BOOST_LOG(info) << "Virtual display driver status: "sv << status_name(reopened);
       return reopened;
     }
 
     /**
-     * @brief Apply the display configuration for the active virtual display.
+     * @brief Apply the display configuration for the active virtual display and report whether it worked.
      *
-     * The virtual display must become primary, so `disabled` and `verify_only` are upgraded to
-     * `ensure_primary`. Resolution and refresh rate always follow the client's request.
+     * The virtual display must become primary, so `disabled`, `verify_only` and `ensure_active` are upgraded to
+     * `ensure_primary`. Resolution and refresh rate always follow the client's request, and HDR is requested off.
      *
-     * @param session The launch session. `enable_sops` is set only for the duration of the call.
+     * @param session The launch session. `enable_sops` is set only for the duration of the call, `enable_hdr` is
+     *                cleared when the configuration was applied and left unchanged otherwise.
+     * @return True when the configuration was applied.
      * @note Must be called with `STATE.mutex` held and after `config::video.output_name` points at the virtual display.
      */
-    void configure_virtual_display(rtsp_stream::launch_session_t &session) {
+    bool configure_virtual_display_unlocked(rtsp_stream::launch_session_t &session) {
       using config_option_e = config::video_t::dd_t::config_option_e;
 
       auto video_config {config::video};
-      if (video_config.dd.configuration_option == config_option_e::disabled || video_config.dd.configuration_option == config_option_e::verify_only) {
-        video_config.dd.configuration_option = config_option_e::ensure_primary;
+      switch (video_config.dd.configuration_option) {
+        case config_option_e::disabled:
+        case config_option_e::verify_only:
+        case config_option_e::ensure_active:
+          video_config.dd.configuration_option = config_option_e::ensure_primary;
+          break;
+        case config_option_e::ensure_primary:
+        case config_option_e::ensure_only_display:
+          break;
       }
       video_config.dd.resolution_option = config::video_t::dd_t::resolution_option_e::automatic;
       video_config.dd.refresh_rate_option = config::video_t::dd_t::refresh_rate_option_e::automatic;
@@ -248,7 +272,12 @@ namespace virtual_display {
       const auto restore_sops {util::fail_guard([&session, enable_sops = std::exchange(session.enable_sops, true)]() {
         session.enable_sops = enable_sops;
       })};
-      display_device::configure_display(video_config, session);
+      const auto enable_hdr {std::exchange(session.enable_hdr, false)};
+      if (!display_device::configure_display_now(video_config, session, STATE.apply_window)) {
+        session.enable_hdr = enable_hdr;
+        return false;
+      }
+      return true;
     }
 
     /**
@@ -278,6 +307,122 @@ namespace virtual_display {
       STATE.original_output_name.clear();
       STATE.active = false;
     }
+
+    /**
+     * @brief Handle a request to stop using the virtual display, deferring it while sessions run.
+     * @note Must be called with `STATE.mutex` held.
+     */
+    void request_end_unlocked() {
+      STATE.launched_with_display = false;
+      if (STATE.active && STATE.sessions > 0) {
+        BOOST_LOG(info) << "Removing the virtual display once the stream has stopped."sv;
+        STATE.end_pending = true;
+        return;
+      }
+      end_unlocked();
+    }
+
+    /**
+     * @brief Loop of the teardown worker: run each requested teardown that is still due.
+     *
+     * Exits when `STATE.worker_stop` is set and no teardown is requested, so a pending request always runs first.
+     */
+    void teardown_worker_main() {
+      platf::set_thread_name("virtual_display::teardown");
+      std::unique_lock lock {STATE.mutex};
+      for (;;) {
+        STATE.teardown_cv.wait(lock, []() {
+#ifdef SUNSHINE_TESTS
+          if (STATE.test_hold_worker && !STATE.worker_stop) {
+            return false;
+          }
+#endif
+          return STATE.teardown_requested || STATE.worker_stop;
+        });
+        if (!STATE.teardown_requested) {
+          break;
+        }
+        STATE.teardown_requested = false;
+        // A begin() or a new session may have run since the request; only a teardown that is still due runs.
+        if (STATE.end_pending && STATE.sessions == 0) {
+          try {
+            end_unlocked();
+          } catch (const std::exception &e) {
+            BOOST_LOG(error) << "Virtual display teardown failed: "sv << e.what();
+          }
+        }
+        STATE.teardown_cv.notify_all();
+      }
+      STATE.worker_running = false;
+      STATE.teardown_cv.notify_all();
+    }
+
+    /**
+     * @brief Hand the deferred teardown to the worker thread, starting it when needed.
+     *
+     * After `shutdown()` the teardown runs in the calling thread instead.
+     *
+     * @note Must be called with `STATE.mutex` held.
+     */
+    void dispatch_teardown_unlocked() {
+      if (STATE.shut_down) {
+        end_unlocked();
+        return;
+      }
+      STATE.teardown_requested = true;
+      if (!STATE.worker_running) {
+        if (STATE.worker.joinable()) {
+          // The previous worker has left its loop and released the lock, so joining it cannot block on us.
+          STATE.worker.join();
+        }
+        STATE.worker_running = true;
+        STATE.worker = std::thread {teardown_worker_main};
+      }
+      STATE.teardown_cv.notify_all();
+    }
+
+    /**
+     * @brief Stop the teardown worker after it has run any requested teardown.
+     * @param mark_shut_down Make later teardowns run in the calling thread.
+     * @note Must be called without `STATE.mutex` held.
+     */
+    void stop_worker(const bool mark_shut_down) {
+      std::thread worker;
+      {
+        std::lock_guard lock {STATE.mutex};
+        if (mark_shut_down) {
+          STATE.shut_down = true;
+        }
+        STATE.worker_stop = true;
+        worker = std::move(STATE.worker);
+      }
+      STATE.teardown_cv.notify_all();
+      if (worker.joinable()) {
+        worker.join();
+      }
+      std::lock_guard lock {STATE.mutex};
+      STATE.worker_stop = false;
+    }
+
+    /**
+     * @brief Joins the teardown worker at exit when `shutdown()` was not called, instead of terminating.
+     *
+     * A teardown still requested at that point is dropped, because other subsystems may already be destroyed;
+     * the state file lets the next start clean up.
+     */
+    struct worker_exit_guard_t {
+      worker_exit_guard_t() = default;
+      worker_exit_guard_t(const worker_exit_guard_t &) = delete;
+      worker_exit_guard_t &operator=(const worker_exit_guard_t &) = delete;
+
+      ~worker_exit_guard_t() {
+        {
+          std::lock_guard lock {STATE.mutex};
+          STATE.teardown_requested = false;
+        }
+        stop_worker(true);
+      }
+    } worker_exit_guard;  ///< Destroyed before `STATE`, which is defined earlier in this file.
 
     /**
      * @brief Clean up a virtual display left behind by a crash.
@@ -333,7 +478,7 @@ namespace virtual_display {
     }
 
     /**
-     * @brief Install a backend, open it and clean up after a crash.
+     * @brief Install a backend and clean up after a crash, opening the driver only when that needs it.
      * @param backend The backend.
      * @param state_file File recording the active virtual display.
      * @note Must be called with `STATE.mutex` held.
@@ -341,6 +486,10 @@ namespace virtual_display {
     void init_unlocked(std::unique_ptr<backend_t> backend, const std::filesystem::path &state_file) {
       STATE.backend = std::move(backend);
       STATE.state_file = state_file;
+      if (std::error_code ec; state_file.empty() || !std::filesystem::exists(state_file, ec)) {
+        BOOST_LOG(info) << "Virtual display driver will be opened when a stream first needs it."sv;
+        return;
+      }
       const auto status {open_backend_unlocked()};
       BOOST_LOG(info) << "Virtual display driver status: "sv << status_name(status);
       recover_unlocked();
@@ -379,7 +528,8 @@ namespace virtual_display {
 
   bool begin(rtsp_stream::launch_session_t &session, std::string_view app_value, const start_e start) {
     std::lock_guard lock {STATE.mutex};
-    if (STATE.end_pending && !STATE.streaming) {
+    if (STATE.end_pending && STATE.sessions == 0) {
+      // The worker has not run the deferred teardown yet; run it now so it cannot remove the display set up below.
       end_unlocked();
     }
 
@@ -403,9 +553,13 @@ namespace virtual_display {
     }
 
     if (STATE.active) {
-      session.enable_hdr = false;
       BOOST_LOG(info) << "Reusing virtual display with mode "sv << session.width << 'x' << session.height << '@' << session.fps;
-      configure_virtual_display(session);
+      if (!configure_virtual_display_unlocked(session)) {
+        BOOST_LOG(warning) << "Could not configure the virtual display, removing it and streaming from the physical display."sv;
+        end_unlocked();
+        STATE.launched_with_display = false;
+        return false;
+      }
       return true;
     }
 
@@ -447,31 +601,54 @@ namespace virtual_display {
     STATE.active = true;
     STATE.launched_with_display = true;
     write_state_unlocked();
-    session.enable_hdr = false;
-    configure_virtual_display(session);
+    if (!configure_virtual_display_unlocked(session)) {
+      BOOST_LOG(warning) << "Could not configure the new virtual display, removing it and streaming from the physical display."sv;
+      end_unlocked();
+      STATE.launched_with_display = false;
+      return false;
+    }
     return true;
   }
 
   void end() {
     std::lock_guard lock {STATE.mutex};
-    STATE.launched_with_display = false;
-    if (STATE.active && STATE.streaming) {
-      BOOST_LOG(info) << "Removing the virtual display once the stream has stopped."sv;
-      STATE.end_pending = true;
+    request_end_unlocked();
+  }
+
+  void end_or_revert(const bool keep_virtual_display) {
+    std::lock_guard lock {STATE.mutex};
+    if (STATE.active) {
+      if (!keep_virtual_display) {
+        request_end_unlocked();
+      }
       return;
     }
-    end_unlocked();
+    if (!keep_virtual_display) {
+      STATE.launched_with_display = false;
+    }
+    display_device::revert_configuration();
   }
 
-  void streaming_started() {
+  void session_started() {
     std::lock_guard lock {STATE.mutex};
-    STATE.streaming = true;
+    ++STATE.sessions;
   }
 
-  void streaming_stopped() {
+  void session_stopped() {
     std::lock_guard lock {STATE.mutex};
-    STATE.streaming = false;
-    if (STATE.end_pending) {
+    if (STATE.sessions == 0) {
+      BOOST_LOG(warning) << "Virtual display session count is unbalanced, ignoring a session stop."sv;
+      return;
+    }
+    if (--STATE.sessions == 0 && STATE.end_pending) {
+      dispatch_teardown_unlocked();
+    }
+  }
+
+  void shutdown() {
+    stop_worker(true);
+    std::lock_guard lock {STATE.mutex};
+    if (STATE.end_pending && STATE.sessions == 0) {
       end_unlocked();
     }
   }
@@ -483,6 +660,7 @@ namespace virtual_display {
 
 #ifdef SUNSHINE_TESTS
   void test_install_backend(std::unique_ptr<backend_t> backend) {
+    stop_worker(false);
     std::lock_guard lock {STATE.mutex};
     STATE.backend = std::move(backend);
     STATE.active = false;
@@ -490,15 +668,44 @@ namespace virtual_display {
     STATE.mode = {};
     STATE.original_output_name.clear();
     STATE.launched_with_display = false;
-    STATE.streaming = false;
+    STATE.sessions = 0;
     STATE.end_pending = false;
     STATE.last_reopen.reset();
     STATE.state_file.clear();
+    STATE.apply_window = default_apply_window;
+    STATE.teardown_requested = false;
+    STATE.shut_down = false;
+    STATE.test_hold_worker = false;
   }
 
   void test_init(std::unique_ptr<backend_t> backend, const std::filesystem::path &state_file) {
     std::lock_guard lock {STATE.mutex};
     init_unlocked(std::move(backend), state_file);
+  }
+
+  void test_wait_for_teardown() {
+    std::unique_lock lock {STATE.mutex};
+    STATE.teardown_cv.wait(lock, []() {
+      return !STATE.teardown_requested;
+    });
+  }
+
+  void test_set_apply_window(const std::chrono::milliseconds window) {
+    std::lock_guard lock {STATE.mutex};
+    STATE.apply_window = window;
+  }
+
+  int test_session_count() {
+    std::lock_guard lock {STATE.mutex};
+    return STATE.sessions;
+  }
+
+  void test_hold_teardown_worker(const bool hold) {
+    {
+      std::lock_guard lock {STATE.mutex};
+      STATE.test_hold_worker = hold;
+    }
+    STATE.teardown_cv.notify_all();
   }
 #endif
 }  // namespace virtual_display

@@ -2322,8 +2322,6 @@ namespace stream {
 
       // If this is the last session, invoke the platform callbacks
       if (--running_sessions == 0) {
-        // The capture threads are gone, so a virtual display teardown deferred by end() can run now.
-        virtual_display::streaming_stopped();
         bool revert_display_config {config::video.dd.config_revert_on_disconnect};
         const bool app_running {proc::proc.running() != 0};
         if (app_running) {
@@ -2337,15 +2335,10 @@ namespace stream {
         }
 
         if (revert_display_config) {
-          if (virtual_display::active()) {
-            // A plain revert would undo the virtual display configuration while the monitor still exists,
-            // so with the app still running keep both for the next resume.
-            if (!app_running) {
-              virtual_display::end();
-            }
-          } else {
-            display_device::revert_configuration();
-          }
+          // A plain revert would undo the virtual display configuration while the monitor still exists,
+          // so with the app still running keep both for the next resume. This session still counts as
+          // running, so ending the virtual display is deferred to session_stopped() below.
+          virtual_display::end_or_revert(app_running);
         }
 
         platf::streaming_will_stop();
@@ -2356,6 +2349,10 @@ namespace stream {
         }
 #endif
       }
+
+      // The capture threads are gone. A virtual display teardown deferred until now runs on a background worker,
+      // outside of the hang watchdog above.
+      virtual_display::session_stopped();
 
       BOOST_LOG(debug) << "Session ended"sv;
     }
@@ -2389,6 +2386,8 @@ namespace stream {
 
       session.pingTimeout = std::chrono::steady_clock::now() + config::stream.ping_timeout;
 
+      // Keeps the virtual display alive while the capture threads run; balanced by session_stopped() in join().
+      virtual_display::session_started();
       session.audioThread = std::jthread {audioThread, &session};
       session.videoThread = std::jthread {videoThread, &session};
 
@@ -2396,7 +2395,6 @@ namespace stream {
 
       // If this is the first session, invoke the platform callbacks
       if (++running_sessions == 1) {
-        virtual_display::streaming_started();
         platf::streaming_will_start();
 #ifdef _WIN32
         // Cap games to the stream frame rate so the GPU doesn't render frames that are never sent

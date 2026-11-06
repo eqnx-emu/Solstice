@@ -13,6 +13,7 @@
 #include <optional>
 #include <regex>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 // lib includes
@@ -45,6 +46,7 @@
 namespace display_device {
   namespace {
     constexpr std::chrono::milliseconds DEFAULT_RETRY_INTERVAL {5000};
+    constexpr std::chrono::milliseconds IMMEDIATE_APPLY_RETRY_INTERVAL {100};  ///< Sleep between the attempts of `configure_display_now()`.
 
 #ifdef _WIN32
     /**
@@ -1098,6 +1100,51 @@ namespace display_device {
       }
     },
                                   {.m_sleep_durations = {DEFAULT_RETRY_INTERVAL}});
+  }
+
+  bool configure_display_now(const config::video_t &video_config, const rtsp_stream::launch_session_t &session, const std::chrono::milliseconds retry_window) {
+    const auto result {parse_configuration(video_config, session)};
+    const auto *parsed_config {std::get_if<SingleDisplayConfiguration>(&result)};
+    if (!parsed_config) {
+      BOOST_LOG(error) << "Display device configuration is disabled or could not be parsed, nothing was applied.";
+      return false;
+    }
+
+    const auto give_up_at {std::chrono::steady_clock::now() + retry_window};
+    for (int attempt {1};; ++attempt) {
+      auto retry_interval {IMMEDIATE_APPLY_RETRY_INTERVAL};
+      {
+        std::lock_guard lock {DD_DATA.mutex};
+        if (!DD_DATA.sm_instance) {
+          // Platform is not supported, nothing to do.
+          return true;
+        }
+#ifdef SUNSHINE_TESTS
+        retry_interval = DD_DATA.test_retry_interval.value_or(retry_interval);
+#endif
+
+        if (attempt == 1) {
+          BOOST_LOG(info) << "Applying display device configuration:\n"
+                          << toJson(*parsed_config);
+        }
+        const auto apply_result {DD_DATA.sm_instance->execute([parsed_config](auto &settings_iface, auto &stop_token) {
+          // Replace pending configuration or revert retries, as scheduling a configuration would.
+          stop_token.requestStop();
+          return settings_iface.applySettings(*parsed_config);
+        })};
+        if (apply_result == SettingsManagerInterface::ApplyResult::Ok) {
+          BOOST_LOG(info) << "Display device configuration applied successfully.";
+          return true;
+        }
+        BOOST_LOG(warning) << "Display device configuration attempt " << attempt << " failed with result: " << apply_result_name(apply_result);
+      }
+
+      if (std::chrono::steady_clock::now() + retry_interval > give_up_at) {
+        BOOST_LOG(error) << "Display device configuration failed after " << attempt << " attempt(s), giving up.";
+        return false;
+      }
+      std::this_thread::sleep_for(retry_interval);
+    }
   }
 
   void revert_configuration() {

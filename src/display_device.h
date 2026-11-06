@@ -117,6 +117,28 @@ namespace display_device {
   void configure_display(const SingleDisplayConfiguration &config);
 
   /**
+   * @brief Configure the display device right now, in the calling thread, and report whether it worked.
+   *
+   * Unlike `configure_display()`, nothing is left scheduled: the configuration is applied in the calling thread,
+   * retried with short sleeps while `retry_window` lasts (a display that was just added may need a moment to
+   * become usable), and the outcome is returned. Like `configure_display()`, a scheduled configuration or revert
+   * retry is replaced, nothing else is cancelled.
+   *
+   * @param video_config User's video related configuration.
+   * @param session Session information.
+   * @param retry_window How long failed attempts are retried before giving up.
+   * @return True when the configuration was applied (or the platform is unsupported),
+   *         false when it is disabled, could not be parsed or kept failing.
+   *
+   * @examples
+   * if (!configure_display_now(config::video, *launch_session, std::chrono::seconds {3})) {
+   *   // fall back
+   * }
+   * @examples_end
+   */
+  [[nodiscard]] bool configure_display_now(const config::video_t &video_config, const rtsp_stream::launch_session_t &session, std::chrono::milliseconds retry_window);
+
+  /**
    * @brief Revert the display configuration and restore the previous state.
    *
    * In case the state could not be restored, by default it will be retried again in 5 seconds

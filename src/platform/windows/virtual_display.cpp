@@ -139,10 +139,13 @@ namespace platf::vdisplay {
       std::lock_guard lg {mutex_};
       handle_ = handle;
     }
+    // Set before the ping thread starts, so that a ping failure it reports is not overwritten.
     status_ = driver_status_e::ok;
-
     if (!start_ping_thread()) {
-      BOOST_LOG(warning) << "SudoVDA: failed to query the driver watchdog"sv;
+      // Without pings the driver removes our monitors after its watchdog timeout, so the handle is not usable.
+      BOOST_LOG(warning) << "SudoVDA: failed to query the driver watchdog, closing the driver"sv;
+      close();
+      status_ = driver_status_e::watchdog_failed;
     }
     return status_;
   }

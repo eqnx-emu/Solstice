@@ -373,7 +373,7 @@ namespace proc {
     return 0;
   }
 
-  void proc_t::terminate() {
+  bool proc_t::terminate() {
     input::terminate_gamepads();
     std::error_code ec;
     placebo = false;
@@ -410,6 +410,7 @@ namespace proc {
     _pipe.reset();
 
     bool has_run = _app_id > 0;
+    bool restored = false;
 
     // Only show the Stopped notification if we actually have an app to stop
     // Since terminate() is always run when a new app has started
@@ -418,14 +419,12 @@ namespace proc {
       system_tray::update_tray_stopped(proc::proc.get_last_run_app_name());
 #endif
 
-      if (virtual_display::active()) {
-        virtual_display::end();
-      } else {
-        display_device::revert_configuration();
-      }
+      virtual_display::end_or_revert();
+      restored = true;
     }
 
     _app_id = -1;
+    return restored;
   }
 
   const std::vector<ctx_t> &proc_t::get_apps() const {
