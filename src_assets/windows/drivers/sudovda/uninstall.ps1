@@ -1,30 +1,34 @@
 <#
 .SYNOPSIS
-Removes the SudoVDA virtual display device node and its certificate (idempotent).
+Removes the SudoVDA device node and certificate installed by Solstice (idempotent).
 
 .DESCRIPTION
-Removes the device node, then checks that no SudoVDA device node is left. A node that does not exist is not an
-error. Exits non-zero when a node could not be removed (or the removal failed and the nodes could not be listed).
-As the last step, the driver certificate trusted by install.ps1 is removed from the Root and TrustedPublisher
-stores, located by the thumbprint of sudovda.cer. Failing to remove the certificate is only a warning.
+Removes only what install.ps1 recorded in HKLM\SOFTWARE\Solstice\SudoVDA, because other products (for example
+Apollo) install the same driver, certificate and hardware ID:
+- The recorded device node (InstanceId) is removed with pnputil /remove-device. Without a record, every SudoVDA
+  device node is left alone. Exits non-zero when the recorded node could not be removed.
+- The certificate is removed from a store only when install.ps1 recorded adding it there (CertAddedRoot,
+  CertAddedTrustedPublisher), our node is gone (or there was none), and the enumeration succeeded and found no
+  SudoVDA device node left. Otherwise it is kept, and the reason and the manual certutil command are logged.
+  Failing to remove the certificate is only a warning.
+The registry key is deleted once nothing recorded in it is left.
 Paths are resolved relative to this script.
 #>
 $ErrorActionPreference = 'Stop'
 
 $HardwareId = 'root\sudomaker\sudovda'
-$ClassGuid = '4D36E968-E325-11CE-BFC1-08002BE10318'
-$Nefcon = Join-Path $PSScriptRoot 'nefconc.exe'
 $Cert = Join-Path $PSScriptRoot 'sudovda.cer'
 $Certutil = Join-Path $env:SystemRoot 'System32\certutil.exe'
+$Pnputil = Join-Path $env:SystemRoot 'System32\pnputil.exe'
+$StateKey = 'HKLM:\SOFTWARE\Solstice\SudoVDA'
 
 # List the instance IDs of the existing SudoVDA device nodes.
 # Returns an array (possibly empty), or $null when the devices could not be enumerated.
 # The arrays are returned with the unary comma so that PowerShell does not unroll them.
 # pnputil output is localised, so instance IDs are matched by their shape (ROOT\<enumerator>\<number>) instead of by label.
 function Get-SudoVdaInstanceIds {
-    $pnputil = Join-Path $env:SystemRoot 'System32\pnputil.exe'
     try {
-        $lines = & $pnputil /enum-devices /deviceid $HardwareId 2>&1
+        $lines = & $Pnputil /enum-devices /deviceid $HardwareId 2>&1
         if ($LASTEXITCODE -eq 0) {
             $ids = @($lines | ForEach-Object { "$_" } |
                     Select-String -Pattern '(?i)\bROOT\\[^\\\s]+\\\d+' -AllMatches |
@@ -41,6 +45,24 @@ function Get-SudoVdaInstanceIds {
     } catch {
         Write-Warning "Could not enumerate SudoVDA device nodes: $($_.Exception.Message)"
         return $null
+    }
+}
+
+# Read one value recorded by install.ps1, or $null when there is none.
+function Get-StateValue {
+    param([string]$Name)
+    try {
+        return (Get-ItemProperty -LiteralPath $StateKey -Name $Name -ErrorAction Stop).$Name
+    } catch {
+        return $null
+    }
+}
+
+# Forget one recorded value.
+function Remove-StateValue {
+    param([string]$Name)
+    if (Test-Path -LiteralPath $StateKey) {
+        Remove-ItemProperty -LiteralPath $StateKey -Name $Name -ErrorAction SilentlyContinue
     }
 }
 
@@ -68,43 +90,87 @@ function Remove-SudoVdaCertificate {
 $ErrorActionPreference = 'Continue'
 $failed = $false
 
-$code = $null
-if (Test-Path -LiteralPath $Nefcon) {
-    Write-Host "Executing: $Nefcon --remove-device-node --hardware-id $HardwareId --class-guid $ClassGuid"
-    $output = & $Nefcon --remove-device-node --hardware-id $HardwareId --class-guid $ClassGuid 2>&1
+# Remove only the device node install.ps1 created; nodes of other products share the hardware ID.
+$ownId = Get-StateValue 'InstanceId'
+$ownNodeGone = $true
+if ($ownId) {
+    Write-Host "Executing: $Pnputil /remove-device $ownId"
+    $output = & $Pnputil /remove-device $ownId 2>&1
     $code = $LASTEXITCODE
     $output | ForEach-Object { Write-Host "  $_" }
-} else {
-    Write-Warning "nefconc.exe not found at $Nefcon, cannot remove the device node"
-}
-
-# nefconc also fails when there is no node to remove, so the outcome is judged by the nodes that are left.
-$remaining = Get-SudoVdaInstanceIds
-if ($null -eq $remaining) {
-    if ($code -ne 0) {
-        Write-Warning "The SudoVDA device node could not be removed (nefconc exit code $code) and the remaining nodes could not be listed"
-        $failed = $true
+    if ($code -eq 0) {
+        Write-Host "SudoVDA device node $ownId removed"
+    } else {
+        # pnputil also fails when the node no longer exists, which is not an error.
+        $listed = Get-SudoVdaInstanceIds
+        if ($null -ne $listed -and ($listed -notcontains "$ownId".ToUpperInvariant())) {
+            Write-Host "SudoVDA device node $ownId no longer exists, nothing to remove"
+        } else {
+            Write-Warning "The SudoVDA device node $ownId could not be removed (pnputil exit code $code)"
+            $ownNodeGone = $false
+            $failed = $true
+        }
     }
-} elseif ($remaining.Count -gt 0) {
-    Write-Warning "SudoVDA device nodes are still present: $($remaining -join ', ')"
-    $failed = $true
-} elseif ($code -ne 0) {
-    Write-Host 'No SudoVDA device node exists, nothing to remove'
+    if ($ownNodeGone) {
+        Remove-StateValue 'InstanceId'
+    }
 } else {
-    Write-Host 'SudoVDA device node removed'
+    Write-Host 'No SudoVDA device node was recorded as installed by Solstice, leaving all SudoVDA device nodes in place'
 }
 
-# Last step: stop trusting the driver certificate. A failure here does not fail the uninstall.
+# The certificate may be removed only when no SudoVDA node, ours or another product's, still needs it.
+$remaining = Get-SudoVdaInstanceIds
+$thumbprint = $null
 try {
     if (-not (Test-Path -LiteralPath $Cert)) {
         throw "sudovda.cer not found at $Cert"
     }
     $thumbprint = (New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList $Cert).Thumbprint
-    foreach ($store in @('Root', 'TrustedPublisher')) {
-        $null = Remove-SudoVdaCertificate -Store $store -Thumbprint $thumbprint
-    }
 } catch {
-    Write-Warning "Could not remove the SudoVDA certificate: $($_.Exception.Message)"
+    Write-Warning "Could not read the SudoVDA certificate: $($_.Exception.Message)"
+}
+
+foreach ($store in @('Root', 'TrustedPublisher')) {
+    $name = "CertAdded$store"
+    if ((Get-StateValue $name) -ne 1) {
+        Write-Host "The SudoVDA certificate in the $store store was not added by Solstice, keeping it"
+        Remove-StateValue $name
+        continue
+    }
+    $reason = $null
+    if ($null -eq $thumbprint) {
+        $reason = 'its thumbprint could not be read from sudovda.cer'
+    } elseif (-not $ownNodeGone) {
+        $reason = 'the Solstice SudoVDA device node could not be removed'
+    } elseif ($null -eq $remaining) {
+        $reason = 'the SudoVDA device nodes could not be listed'
+    } elseif ($remaining.Count -gt 0) {
+        $reason = "SudoVDA device nodes of other software remain ($($remaining -join ', '))"
+    }
+    if ($null -ne $reason) {
+        $manual = if ($null -eq $thumbprint) { "$Certutil -delstore $store <thumbprint of sudovda.cer>" } else { "$Certutil -delstore $store $thumbprint" }
+        Write-Warning "Keeping the SudoVDA certificate in the $store store because $reason. To remove it manually, run from an elevated prompt: $manual"
+        continue
+    }
+    if (Remove-SudoVdaCertificate -Store $store -Thumbprint $thumbprint) {
+        Remove-StateValue $name
+    } else {
+        Write-Warning "To remove it manually, run from an elevated prompt: $Certutil -delstore $store $thumbprint"
+    }
+}
+
+# Delete the record once nothing recorded in it is left.
+if (Test-Path -LiteralPath $StateKey) {
+    $left = @((Get-Item -LiteralPath $StateKey).Property)
+    if ($left.Count -eq 0) {
+        Remove-Item -LiteralPath $StateKey -Force -ErrorAction SilentlyContinue
+        $parent = Split-Path -Parent $StateKey
+        if ((Test-Path -LiteralPath $parent) -and @((Get-ChildItem -LiteralPath $parent)).Count -eq 0 -and @((Get-Item -LiteralPath $parent).Property).Count -eq 0) {
+            Remove-Item -LiteralPath $parent -Force -ErrorAction SilentlyContinue
+        }
+    } else {
+        Write-Host "Keeping $StateKey, still recording: $($left -join ', ')"
+    }
 }
 
 if ($failed) {

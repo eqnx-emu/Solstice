@@ -50,7 +50,9 @@ below, the [Sunshine documentation](https://docs.lizardbyte.dev/projects/sunshin
   bundled [SudoVDA](https://github.com/SudoMaker/SudoVDA) driver (installed by the Windows installer). Off by default;
   falls back to the physical display if the driver is missing.
 * The installer adds the driver certificate (`sudovda.cer`) to the machine Root and TrustedPublisher stores.
-  Uninstall removes the device node and then the certificate from both stores.
+  Uninstall removes only what Solstice installed: its own device node, and the certificate only from stores it was
+  not already in and only when no SudoVDA device node is left (for example one from Apollo). `docs/legal.md` has the
+  details and the manual removal commands.
 
 ### 🌐 Web UI
 
