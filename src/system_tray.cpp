@@ -89,6 +89,8 @@ using namespace std::literals;
 // system_tray namespace
 namespace system_tray {
   namespace {
+    constexpr auto tray_display_name = "Solstice";  ///< Product name shown in the tray tooltip.
+
     /**
      * @brief Access the process-wide tray initialization state.
      *
@@ -291,14 +293,14 @@ namespace system_tray {
   // Tray menu
   static struct tray tray = {
     .icon = TRAY_ICON,
-    .tooltip = PROJECT_NAME,
+    .tooltip = tray_display_name,
   #ifdef __APPLE__
     .cb = tray_native_menu_click_cb,
   #endif
     .menu =
       (struct tray_menu[]) {
         // Tray menu labels currently use the project's English source strings.
-        {.text = "Open Sunshine", .cb = tray_open_ui_cb},
+        {.text = "Open Solstice", .cb = tray_open_ui_cb},
         {.text = "-"},
   #if defined(_WIN32) || defined(__APPLE__)
         {.text = "Virtual HID Broker", .submenu = virtualhid_license_menu.data()},
@@ -342,7 +344,7 @@ namespace system_tray {
   void reset_tray_data_for_testing() {
     const std::scoped_lock lock(tray_state_mutex());
     tray.icon = tray.allIconPaths[0];
-    tray.tooltip = PROJECT_NAME;
+    tray.tooltip = tray_display_name;
     tray.notification_icon = nullptr;
     tray.notification_text = nullptr;
     tray.notification_title = nullptr;
@@ -568,7 +570,7 @@ namespace system_tray {
     const auto displayed_version = version.empty() ? "unknown" : std::format("v{}", version);
     auto &notification_text = virtualhid_driver_notification_text_storage();
     notification_text = std::format(
-      "Installed Virtual HID Broker {} is not supported by this version of Sunshine. Supported versions: {}. Restart Sunshine after updating. Click for instructions.",
+      "Installed Virtual HID Broker {} is not supported by this version of Solstice. Supported versions: {}. Restart Solstice after updating. Click for instructions.",
       displayed_version,
       supported_versions
     );
@@ -909,7 +911,7 @@ namespace system_tray {
     tray.notification_icon = tray.allIconPaths[0];
     tray.notification_title = "Application Stopped";
     tray.notification_text = msg.c_str();
-    tray.tooltip = PROJECT_NAME;
+    tray.tooltip = tray_display_name;
     tray_update(&tray);
   }
 
@@ -929,7 +931,7 @@ namespace system_tray {
     tray.notification_title = "Incoming Pairing Request";
     tray.notification_text = "Click here to complete the pairing process";
     tray.notification_icon = tray.allIconPaths[1];
-    tray.tooltip = PROJECT_NAME;
+    tray.tooltip = tray_display_name;
     tray.notification_cb = []() {
       launch_ui("/pin");
     };
