@@ -50,7 +50,7 @@ below, the [Sunshine documentation](https://docs.lizardbyte.dev/projects/sunshin
   bundled [SudoVDA](https://github.com/SudoMaker/SudoVDA) driver (installed by the Windows installer). Off by default;
   falls back to the physical display if the driver is missing.
 * The installer adds the driver certificate (`sudovda.cer`) to the machine Root and TrustedPublisher stores.
-  Uninstall removes only the device node; `docs/legal.md` shows how to remove the certificate manually.
+  Uninstall removes the device node and then the certificate from both stores.
 
 ### 🌐 Web UI
 

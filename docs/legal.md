@@ -37,6 +37,5 @@ SudoVDA publishes no binary releases, so the signed `SudoVDA.dll` is extracted a
 The driver is installed with [nefcon](https://github.com/nefarius/nefcon) (`nefconc.exe`, MIT License).
 
 The installer adds `sudovda.cer` to the machine **Root** and **TrustedPublisher** certificate stores so Windows accepts
-the driver. Uninstalling removes only the device node, not the certificate. To remove it manually, run from an elevated
-prompt (use `certutil -dump sudovda.cer` for the serial number or hash):
-`certutil -delstore root <serial-or-hash>` and `certutil -delstore TrustedPublisher <serial-or-hash>`.
+the driver. Uninstalling removes the device node and then removes the certificate from both stores, located by the
+thumbprint of `sudovda.cer`. If the certificate cannot be removed, the uninstaller only logs a warning.
