@@ -183,6 +183,8 @@ set(SUNSHINE_TARGET_FILES
         "${CMAKE_SOURCE_DIR}/src/process.cpp"
         "${CMAKE_SOURCE_DIR}/src/process.h"
         "${CMAKE_SOURCE_DIR}/src/process_gamepad.h"
+        "${CMAKE_SOURCE_DIR}/src/speedtest.cpp"
+        "${CMAKE_SOURCE_DIR}/src/speedtest.h"
         "${CMAKE_SOURCE_DIR}/src/virtual_display.cpp"
         "${CMAKE_SOURCE_DIR}/src/virtual_display.h"
         "${CMAKE_SOURCE_DIR}/src/network.cpp"

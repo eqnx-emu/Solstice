@@ -35,6 +35,7 @@
 #include "platform/common.h"
 #include "process.h"
 #include "rtsp.h"
+#include "speedtest.h"
 #include "string_hash.h"
 #include "system_tray.h"
 #include "utility.h"
@@ -1360,6 +1361,86 @@ namespace nvhttp {
   }
 
   /**
+   * @brief Answer a connection test latency probe.
+   * @details Only reachable by paired clients (the HTTPS server verifies the client certificate before routing).
+   * The reply has an empty body with `Content-Length: 0` and no `Connection: close`, so clients can reuse the
+   * connection and measure round-trip time per request.
+   *
+   * @param response HTTP response object to populate.
+   * @param request HTTP request data from the client.
+   */
+  void solstice_ping(resp_https_t response, req_https_t request) {
+    print_req<SunshineHTTPS>(request);
+
+    response->write(SimpleWeb::StatusCode::success_ok, "", SimpleWeb::CaseInsensitiveMultimap {{"Cache-Control", "no-store"}});
+  }
+
+  /**
+   * @brief State of one in-flight speed test download, kept alive by the pending send callback.
+   */
+  struct speedtest_stream_t {
+    resp_https_t response;  ///< Response being streamed; closing it ends the download.
+    speedtest::slot_t slot;  ///< Concurrency slot, released when the stream state is destroyed on any exit path.
+    std::chrono::steady_clock::time_point deadline;  ///< Time at which the stream stops.
+    std::size_t sent_blocks = 0;  ///< Number of blocks queued so far.
+  };
+
+  /**
+   * @brief Queue the next speed test block, or finish the stream.
+   * @details Each block is sent asynchronously; the next one is queued from the completion callback, so no
+   * thread is blocked and the stream stops as soon as the deadline passes, shutdown is requested, or a write
+   * fails (the client disconnected or cancelled). When the last reference to the state is dropped the slot is
+   * released and the connection is closed.
+   *
+   * @param state Stream state shared with the pending callback.
+   */
+  void speedtest_send_next(const std::shared_ptr<speedtest_stream_t> &state) {
+    if (std::chrono::steady_clock::now() >= state->deadline || mail::man->event<bool>(mail::shutdown)->peek()) {
+      return;
+    }
+
+    const auto chunk = speedtest::block(state->sent_blocks++);
+    state->response->write(chunk.data(), static_cast<std::streamsize>(chunk.size()));
+    state->response->send([state](const SimpleWeb::error_code &ec) {
+      if (ec) {
+        BOOST_LOG(debug) << "Speed test stopped: client disconnected or cancelled ("sv << ec.message() << ')';
+        return;
+      }
+      speedtest_send_next(state);
+    });
+  }
+
+  /**
+   * @brief Stream pseudorandom data to measure the connection's throughput.
+   * @details Replies 400 for an invalid `seconds`, 409 while a streaming session is active and 429 while another
+   * speed test runs. Otherwise the body is a close-delimited stream of 64 KiB blocks for `seconds` seconds.
+   *
+   * @param response HTTP response object to populate.
+   * @param request HTTP request data from the client.
+   */
+  void solstice_speedtest(resp_https_t response, req_https_t request) {
+    print_req<SunshineHTTPS>(request);
+
+    const auto args = request->parse_query_string();
+    const auto seconds_it = args.find("seconds"s);
+    auto admission = speedtest::admit(seconds_it == std::end(args) ? ""sv : std::string_view {seconds_it->second}, rtsp_stream::session_count());
+    if (admission.status != 200) {
+      response->write(static_cast<SimpleWeb::StatusCode>(admission.status), "", SimpleWeb::CaseInsensitiveMultimap {{"Cache-Control", "no-store"}});
+      return;
+    }
+
+    auto state = std::make_shared<speedtest_stream_t>();
+    state->response = response;
+    state->slot = std::move(admission.slot);
+    state->deadline = std::chrono::steady_clock::now() + std::chrono::seconds {admission.seconds};
+
+    // No Content-Length: the body is delimited by closing the connection once the state is released.
+    response->close_connection_after_response = true;
+    response->write(SimpleWeb::StatusCode::success_ok, SimpleWeb::CaseInsensitiveMultimap {{"Content-Type", "application/octet-stream"}, {"Cache-Control", "no-store"}, {"Connection", "close"}});
+    speedtest_send_next(state);
+  }
+
+  /**
    * @brief Launch the requested application for a GameStream session.
    *
    * @param host_audio Host audio.
@@ -1754,6 +1835,8 @@ namespace nvhttp {
       resume(host_audio, resp, req);
     };
     https_server.resource["^/cancel$"]["GET"] = cancel;
+    https_server.resource["^/solstice/ping$"]["GET"] = solstice_ping;
+    https_server.resource["^/solstice/speedtest$"]["GET"] = solstice_speedtest;
 
     https_server.config.reuse_address = true;
     https_server.config.address = net::get_bind_address(address_family);

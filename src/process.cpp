@@ -44,6 +44,9 @@
 
   // _SH constants for _wfsopen()
   #include <share.h>
+
+  // GetModuleFileNameW() to locate the network stress tool next to the executable
+  #include <windows.h>
 #endif
 
 namespace proc {
@@ -771,10 +774,43 @@ namespace proc {
     return std::make_tuple(id_no_index, id_with_index);
   }
 
+  namespace {
+    constexpr auto netstress_exe_name = "solstice-netstress.exe"sv;  ///< File name of the network stress tool.
+
+    /**
+     * @brief Find the network stress tool.
+     *
+     * @param tools_dir Directory to search, or empty for the directory of the running executable.
+     * @return Path of the tool, or an empty path when it is not installed.
+     */
+    std::filesystem::path find_netstress(const std::filesystem::path &tools_dir) {
+      std::filesystem::path base = tools_dir;
+#ifdef _WIN32
+      if (base.empty()) {
+        std::array<WCHAR, MAX_PATH> executable {};
+        if (GetModuleFileNameW(nullptr, executable.data(), executable.size()) != 0) {
+          base = std::filesystem::path {executable.data()}.parent_path();
+        }
+      }
+#endif
+      if (base.empty()) {
+        return {};
+      }
+
+      std::error_code ec;
+      for (const auto &candidate : {base / netstress_exe_name, base / "tools" / netstress_exe_name}) {
+        if (std::filesystem::is_regular_file(candidate, ec)) {
+          return candidate;
+        }
+      }
+      return {};
+    }
+  }  // namespace
+
   /**
    * @brief Parse serialized text into the corresponding runtime representation.
    */
-  std::optional<proc::proc_t> parse(const std::string &file_name) {
+  std::optional<proc::proc_t> parse(const std::string &file_name, const std::filesystem::path &tools_dir) {
     pt::ptree tree;
 
     try {
@@ -894,6 +930,24 @@ namespace proc {
         ctx.name = std::move(name);
         ctx.prep_cmds = std::move(prep_cmds);
         ctx.detached = std::move(detached);
+
+        apps.emplace_back(std::move(ctx));
+      }
+
+      if (const auto netstress = find_netstress(tools_dir); !netstress.empty()) {
+        // Synthetic app for the client's connection test; it only exists here, never in apps.json.
+        proc::ctx_t ctx;
+        ctx.name = std::string {network_test_app_name};
+        ctx.cmd = "\"" + netstress.string() + "\"";
+        ctx.working_dir = netstress.parent_path().string();
+        ctx.elevated = false;
+        ctx.auto_detach = false;
+        ctx.wait_all = true;
+        ctx.exit_timeout = std::chrono::seconds {5};
+
+        auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
+        ctx.id = ids.count(std::get<0>(possible_ids)) == 0 ? std::get<0>(possible_ids) : std::get<1>(possible_ids);
+        ids.insert(ctx.id);
 
         apps.emplace_back(std::move(ctx));
       }

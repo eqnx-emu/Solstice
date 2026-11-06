@@ -13,7 +13,9 @@
 #endif
 
 // standard includes
+#include <filesystem>
 #include <optional>
+#include <string_view>
 #include <unordered_map>
 
 // local includes
@@ -237,11 +239,17 @@ namespace proc {
   void refresh(const std::string &file_name);
   /**
    * @brief Parse serialized text into the corresponding runtime representation.
+   * @details When `solstice-netstress.exe` is found, a synthetic "Solstice Network Test" app is appended.
    *
    * @param file_name File name.
+   * @param tools_dir Directory searched for `solstice-netstress.exe`, directly and in its `tools` subdirectory.
+   *                  Empty (the default) means the directory of the running executable. Tests pass a temporary
+   *                  directory here.
    * @return Parsed value or parse status.
    */
-  std::optional<proc::proc_t> parse(const std::string &file_name);
+  std::optional<proc::proc_t> parse(const std::string &file_name, const std::filesystem::path &tools_dir = {});
+
+  constexpr std::string_view network_test_app_name = "Solstice Network Test";  ///< Name clients use to find the synthetic connection test app.
 
   /**
    * @brief Normalize an application's gamepad type override.

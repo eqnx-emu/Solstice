@@ -55,6 +55,7 @@ install(TARGETS audio-info RUNTIME DESTINATION "tools" COMPONENT audio)
 
 # Mandatory tools
 install(TARGETS sunshinesvc RUNTIME DESTINATION "tools" COMPONENT application)
+install(TARGETS solstice-netstress RUNTIME DESTINATION "tools" COMPONENT application)
 
 # Mandatory scripts
 install(FILES

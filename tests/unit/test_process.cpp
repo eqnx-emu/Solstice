@@ -952,6 +952,62 @@ TEST_F(ProcessRefreshTest, GetAppVirtualDisplayFindsTheAppById) {
   EXPECT_EQ(target.get_app_virtual_display(43), "");
 }
 
+/**
+ * @brief Fixture for parse() tests that exercise the synthetic network test app.
+ */
+class ProcParse: public ProcessRefreshTest {};
+
+TEST_F(ProcParse, AddsNetworkTestAppWhenToolPresent) {
+  const fs::path tools_dir = test_dir / "netstress_present";
+  fs::create_directories(tools_dir);
+  { std::ofstream(tools_dir / "solstice-netstress.exe") << "stub"; }
+  const fs::path apps_file = test_dir / "apps_netstress.json";
+  writeAppsJson(apps_file, {"Game"});
+
+  auto parsed = proc::parse(apps_file.string(), tools_dir);
+
+  ASSERT_TRUE(parsed.has_value());
+  const auto &apps = parsed->get_apps();
+  ASSERT_EQ(apps.size(), 2u);
+  EXPECT_EQ(apps[0].name, "Game");
+  EXPECT_EQ(apps[1].name, "Solstice Network Test");
+  EXPECT_FALSE(apps[1].id.empty());
+  EXPECT_NE(apps[1].id, apps[0].id);
+  EXPECT_EQ(apps[1].image_path, "");
+  EXPECT_NE(apps[1].cmd.find("solstice-netstress.exe"), std::string::npos);
+  EXPECT_FALSE(apps[1].elevated);
+
+  auto reparsed = proc::parse(apps_file.string(), tools_dir);
+  ASSERT_TRUE(reparsed.has_value());
+  EXPECT_EQ(reparsed->get_apps()[1].id, apps[1].id);
+}
+
+TEST_F(ProcParse, AddsNetworkTestAppFromToolsSubdirectory) {
+  const fs::path base_dir = test_dir / "netstress_subdir";
+  fs::create_directories(base_dir / "tools");
+  { std::ofstream(base_dir / "tools" / "solstice-netstress.exe") << "stub"; }
+  const fs::path apps_file = test_dir / "apps_netstress_sub.json";
+  writeAppsJson(apps_file, {"Game"});
+
+  auto parsed = proc::parse(apps_file.string(), base_dir);
+
+  ASSERT_TRUE(parsed.has_value());
+  EXPECT_EQ(parsed->get_apps().size(), 2u);
+}
+
+TEST_F(ProcParse, OmitsNetworkTestAppWhenToolAbsent) {
+  const fs::path tools_dir = test_dir / "netstress_absent";
+  fs::create_directories(tools_dir);
+  const fs::path apps_file = test_dir / "apps_no_netstress.json";
+  writeAppsJson(apps_file, {"Game"});
+
+  auto parsed = proc::parse(apps_file.string(), tools_dir);
+
+  ASSERT_TRUE(parsed.has_value());
+  ASSERT_EQ(parsed->get_apps().size(), 1u);
+  EXPECT_EQ(parsed->get_apps()[0].name, "Game");
+}
+
 TEST(VirtualDisplayTest, ShouldUseVirtualDisplay) {
   using enum config::video_t::virtual_display_e;
   EXPECT_TRUE(virtual_display::should_use(disabled, "enabled"));

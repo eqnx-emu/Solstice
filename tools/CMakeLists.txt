@@ -47,3 +47,12 @@ target_link_libraries(sunshinesvc
         wtsapi32
         ${PLATFORM_LIBRARIES})
 target_compile_options(sunshinesvc PRIVATE ${SUNSHINE_COMPILE_OPTIONS})
+
+# Fullscreen noise window used by the synthetic "Solstice Network Test" app
+add_executable(solstice-netstress WIN32 netstress/main.cpp)
+target_link_libraries(solstice-netstress
+        user32
+        gdi32
+        shell32)
+target_compile_options(solstice-netstress PRIVATE ${SUNSHINE_COMPILE_OPTIONS})
+target_link_options(solstice-netstress PRIVATE -municode)
