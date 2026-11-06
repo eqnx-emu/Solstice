@@ -965,6 +965,11 @@ TEST(VirtualDisplayTest, ShouldUseVirtualDisplay) {
   EXPECT_TRUE(virtual_display::should_use(always, ""));
 }
 
+namespace {
+  using virtual_display_test::make_session;
+  using virtual_display_test::physical_device_id;
+}  // namespace
+
 /**
  * @brief Fixture that runs a Desktop-style app on the global process registry over a fake virtual display.
  *

@@ -12,6 +12,17 @@
 #include <algorithm>
 #include <chrono>
 
+namespace {
+  using virtual_display_test::config_option_e;
+  using virtual_display_test::device_prep_t;
+  using virtual_display_test::expected_guid;
+  using virtual_display_test::make_session;
+  using virtual_display_test::physical_device_id;
+  using virtual_display_test::virtual_device_id;
+  using virtual_display_test::virtual_display_e;
+  using virtual_display_test::virtual_gdi_name;
+}  // namespace
+
 TEST_F(VirtualDisplay, SkipsWhenDisabled) {
   config::video.virtual_display = virtual_display_e::disabled;
   auto session {make_session(1280, 720, 60)};

@@ -219,8 +219,6 @@ namespace virtual_display_test {
   }
 }  // namespace virtual_display_test
 
-using namespace virtual_display_test;
-
 /**
  * @brief Fixture installing a fake backend and a recording settings manager.
  */
@@ -229,14 +227,14 @@ protected:
   void SetUp() override {
     BaseTest::SetUp();
     saved_video = config::video;
-    config::video.virtual_display = virtual_display_e::always;
-    config::video.output_name = physical_device_id;
-    config::video.dd.configuration_option = config_option_e::disabled;
-    log = std::make_shared<call_log_t>();
-    install_backend(virtual_display::driver_status_e::ok, std::string {virtual_gdi_name});
+    config::video.virtual_display = virtual_display_test::virtual_display_e::always;
+    config::video.output_name = virtual_display_test::physical_device_id;
+    config::video.dd.configuration_option = virtual_display_test::config_option_e::disabled;
+    log = std::make_shared<virtual_display_test::call_log_t>();
+    install_backend(virtual_display::driver_status_e::ok, std::string {virtual_display_test::virtual_gdi_name});
 
     const auto persistence {display_device::test_make_watched_persistence()};
-    auto manager {std::make_unique<recording_settings_manager_t>(log, persistence)};
+    auto manager {std::make_unique<virtual_display_test::recording_settings_manager_t>(log, persistence)};
     settings = manager.get();
     display_device::test_install_settings_manager(std::move(manager), persistence);
   }
@@ -255,13 +253,13 @@ protected:
    * @param create_result Name returned by `create`.
    */
   void install_backend(virtual_display::driver_status_e status, std::optional<std::string> create_result) {
-    auto fake {std::make_unique<fake_backend_t>(log, status, std::move(create_result))};
+    auto fake {std::make_unique<virtual_display_test::fake_backend_t>(log, status, std::move(create_result))};
     backend = fake.get();
     virtual_display::test_install_backend(std::move(fake));
   }
 
   config::video_t saved_video {};  ///< Video config restored after the test.
-  std::shared_ptr<call_log_t> log;  ///< Shared call log.
-  fake_backend_t *backend {nullptr};  ///< Installed fake backend.
-  recording_settings_manager_t *settings {nullptr};  ///< Installed settings manager.
+  std::shared_ptr<virtual_display_test::call_log_t> log;  ///< Shared call log.
+  virtual_display_test::fake_backend_t *backend {nullptr};  ///< Installed fake backend.
+  virtual_display_test::recording_settings_manager_t *settings {nullptr};  ///< Installed settings manager.
 };

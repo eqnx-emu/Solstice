@@ -2323,7 +2323,8 @@ namespace stream {
       // If this is the last session, invoke the platform callbacks
       if (--running_sessions == 0) {
         bool revert_display_config {config::video.dd.config_revert_on_disconnect};
-        if (proc::proc.running()) {
+        const bool app_running {proc::proc.running() != 0};
+        if (app_running) {
 #if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
           system_tray::update_tray_pausing(proc::proc.get_last_run_app_name());
 #endif
@@ -2334,8 +2335,12 @@ namespace stream {
         }
 
         if (revert_display_config) {
-          if (virtual_display::active() && !proc::proc.running()) {
-            virtual_display::end();
+          if (virtual_display::active()) {
+            // A plain revert would undo the virtual display configuration while the monitor still exists,
+            // so with the app still running keep both for the next resume.
+            if (!app_running) {
+              virtual_display::end();
+            }
           } else {
             display_device::revert_configuration();
           }
