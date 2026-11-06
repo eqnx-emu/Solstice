@@ -391,9 +391,15 @@ namespace virtual_display {
     }
 
     if (STATE.active && STATE.backend && STATE.backend->status() != driver_status_e::ok) {
-      // The driver connection was lost (watchdog), so the display is gone: start over with a new one.
-      BOOST_LOG(warning) << "Virtual display driver connection was lost (status: "sv << status_name(STATE.backend->status()) << "), re-creating the virtual display."sv;
-      end_unlocked();
+      // The driver connection was lost (watchdog), so the display is gone and Windows moved the game elsewhere.
+      BOOST_LOG(warning) << "Virtual display driver connection was lost (status: "sv << status_name(STATE.backend->status()) << ")."sv;
+      end_unlocked();  // also restores config::video.output_name
+      if (start == start_e::resume) {
+        // Re-creating the display now would leave the stream on an empty desktop: the game is on the physical display.
+        BOOST_LOG(warning) << "Not re-creating the virtual display on resume, streaming from the physical display."sv;
+        STATE.launched_with_display = false;
+        return false;
+      }
     }
 
     if (STATE.active) {

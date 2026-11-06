@@ -353,14 +353,34 @@ TEST_F(VirtualDisplay, RateLimitsDriverReopen) {
   EXPECT_TRUE(backend->creates.empty());
 }
 
-TEST_F(VirtualDisplay, RecreatesDisplayAfterWatchdogFailure) {
+TEST_F(VirtualDisplay, ResumeDoesNotRecreateDisplayAfterWatchdogFailure) {
   auto session {make_session(1280, 720, 60)};
   ASSERT_TRUE(virtual_display::begin(*session, "", launch));
 
   backend->status_value = virtual_display::driver_status_e::watchdog_failed;
   backend->open_status = virtual_display::driver_status_e::ok;
   auto resumed {make_session(1920, 1080, 60)};
-  ASSERT_TRUE(virtual_display::begin(*resumed, "", resume));
+  EXPECT_FALSE(virtual_display::begin(*resumed, "", resume));
+
+  EXPECT_EQ(backend->creates.size(), 1);
+  EXPECT_FALSE(virtual_display::active());
+  EXPECT_EQ(config::video.output_name, physical_device_id);
+  EXPECT_TRUE(resumed->enable_hdr);
+
+  // The launched-with-display state was cleared, so a later resume does not create one either.
+  auto again {make_session(1920, 1080, 60)};
+  EXPECT_FALSE(virtual_display::begin(*again, "", resume));
+  EXPECT_EQ(backend->creates.size(), 1);
+}
+
+TEST_F(VirtualDisplay, LaunchRecreatesDisplayAfterWatchdogFailure) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+
+  backend->status_value = virtual_display::driver_status_e::watchdog_failed;
+  backend->open_status = virtual_display::driver_status_e::ok;
+  auto resumed {make_session(1920, 1080, 60)};
+  ASSERT_TRUE(virtual_display::begin(*resumed, "", launch));
 
   EXPECT_TRUE(happens_after(log->snapshot(), "open", "create"));
   ASSERT_EQ(backend->creates.size(), 2);
