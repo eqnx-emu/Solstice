@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solstice: Sunshine for the Nintendo Switch</title>
+  <meta name="description" content="Solstice is a Windows fork of Sunshine for streaming to a Nintendo Switch. It emulates a Switch 2 Pro Controller with gyro and HD rumble, can stream a virtual display at your Switch's exact mode, and caps the NVIDIA frame limiter to the stream.">
+  <meta property="og:title" content="Solstice: Sunshine for the Nintendo Switch">
+  <meta property="og:description" content="Your PC sees a Switch 2 Pro Controller, so games show Nintendo button prompts.">
+  <meta property="og:image" content="https://luizfbalves.github.io/Solstice/assets/solstice_logo_dark.png">
+  <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /*
+      Design notes (why each choice exists):
+      - Palette: the Solstice/Equinox logo colors. Dusk navy is the neutral base, moon blue is the core color for links
+        and "Solstice has it" marks, sun gold is the single accent, kept to the download button, the headline phrase
+        and the A button. Nothing else uses gold.
+      - Dark theme: the brand is built on dusk (the app icon tile and the Equinox client are dark), and the logo colors
+        were picked against it. There is no light variant of the brand to toggle to.
+      - Onest: the typeface of the Solstice and Equinox wordmarks, so the page and the apps read as one family.
+      - Identity motif: two halves side by side, like the logo. Sunshine next to Solstice, Solstice next to Equinox.
+      - Hero glow: the same soft glow as the app icon tile, only behind the hero, so the mark sits where it does in the app.
+      - Dials: ENERGY 2 / RHYTHM 2 / MOTION 1 (hover and focus states only).
+    */
+    :root {
+      --night: #0e1124;
+      --dusk: #161a33;
+      --glow: #232858;
+      --card: #1b2042;
+      --line: #2b3163;
+      --sun: #f4b860;
+      --moon: #9db8ff;
+      --text: #eef0fa;
+      --muted: #a9b0d4;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "Onest", system-ui, sans-serif;
+      background: var(--night);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--moon); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    a:hover { color: var(--text); }
+    a, button, summary { cursor: pointer; }
+    :focus-visible { outline: 2px solid var(--moon); outline-offset: 3px; border-radius: 6px; }
+    section, header { scroll-margin-top: 64px; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+    nav.top { position: sticky; top: 0; z-index: 10; background: rgba(14, 17, 36, .9); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+    nav.top .wrap { display: flex; align-items: center; gap: 28px; min-height: 64px; }
+    .brand { display: flex; align-items: center; min-height: 44px; gap: 10px; font-weight: 600; font-size: 19px; color: var(--text); text-decoration: none; }
+    .brand:hover { color: var(--text); }
+    nav.top ul { display: flex; gap: 6px; margin: 0 0 0 auto; padding: 0; list-style: none; }
+    nav.top ul a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px; color: var(--muted); text-decoration: none; font-size: 15px; border-radius: 8px; }
+    nav.top ul a:hover { color: var(--text); background: var(--card); }
+
+    .btn { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 22px; border-radius: 10px; font-weight: 600; font-size: 16px; text-decoration: none; border: 1px solid transparent; }
+    .btn-sun { background: var(--sun); color: var(--dusk); }
+    .btn-sun:hover { background: #f8cd8f; color: var(--dusk); }
+    .btn-sun:active { background: #e9a94a; }
+    .btn-line { border-color: var(--line); color: var(--text); }
+    .btn-line:hover { background: var(--card); color: var(--text); border-color: var(--muted); }
+    .btn-line:active { background: var(--dusk); }
+
+    header.hero { padding: 104px 0 96px; background: radial-gradient(ellipse 60% 70% at 78% 40%, var(--glow), transparent 70%), var(--night); }
+    .hero .wrap { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr); gap: 48px; align-items: center; }
+    h1 { font-size: clamp(38px, 5.6vw, 66px); line-height: 1.04; margin: 0 0 24px; font-weight: 700; letter-spacing: -.02em; }
+    h1 span { color: var(--sun); }
+    .lead { font-size: 19px; color: var(--muted); max-width: 560px; margin: 0 0 34px; }
+    .cta { display: flex; flex-wrap: wrap; gap: 14px; }
+    .fine { margin: 22px 0 0; font-size: 14px; color: var(--muted); }
+    .hero-mark { justify-self: center; width: min(340px, 80%); height: auto; }
+
+    h2 { font-size: clamp(30px, 3.8vw, 44px); line-height: 1.1; margin: 0 0 18px; letter-spacing: -.015em; }
+    h3 { margin: 0 0 6px; font-size: 19px; line-height: 1.3; }
+    .sub { color: var(--muted); font-size: 18px; max-width: 640px; margin: 0; }
+
+    #controller { padding: 112px 0 104px; }
+    .controller { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; align-items: center; }
+    .controller .sub { margin-bottom: 32px; }
+    ul.points { list-style: none; padding: 0; margin: 0; display: grid; gap: 16px; border-top: 1px solid var(--line); }
+    ul.points li { padding-top: 16px; }
+    ul.points b { font-weight: 600; }
+    ul.points span { color: var(--muted); }
+    .pads { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+    .pad { padding: 26px 18px 22px; text-align: center; background: var(--card); }
+    .pad + .pad { border-left: 1px solid var(--line); background: var(--dusk); }
+    .pad h3 { font-size: 16px; margin: 0; }
+    .pad p { margin: 0 0 12px; font-size: 14px; color: var(--muted); }
+    .pad svg { width: 140px; height: 140px; display: block; margin: 0 auto; }
+    .pad .says { margin: 14px 0 0; font-size: 14px; color: var(--muted); }
+    .pad + .pad .says { color: var(--text); }
+
+    #performance { padding: 104px 0; background: var(--dusk); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .perf { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 56px; align-items: start; }
+    .perf-main { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 32px; }
+    .perf-main h3 { font-size: 24px; margin-bottom: 10px; }
+    .perf-main p { margin: 0; color: var(--muted); }
+    .perf-main dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 18px; margin: 24px 0 0; padding-top: 20px; border-top: 1px solid var(--line); font-size: 15px; }
+    .perf-main dt { color: var(--muted); }
+    .perf-main dd { margin: 0; }
+    .perf-side { display: grid; gap: 28px; margin-top: 28px; }
+    .perf-side p { margin: 0; color: var(--muted); }
+
+    #more { padding: 88px 0 72px; }
+    .more { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 56px; }
+    .more ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
+    .more li p { margin: 0; color: var(--muted); font-size: 15.5px; }
+
+    #compare { padding: 72px 0 104px; }
+    #compare .sub { margin-bottom: 36px; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+    table { width: 100%; border-collapse: collapse; font-size: 15.5px; min-width: 600px; }
+    caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    th, td { padding: 15px 22px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+    tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
+    thead th { font-size: 15px; font-weight: 600; background: var(--dusk); }
+    tbody th { font-weight: 500; width: 36%; background: var(--card); }
+    td { color: var(--muted); background: var(--card); }
+    td.ours { background: var(--dusk); color: var(--text); }
+    thead th.ours { background: var(--glow); }
+    td.ours b { color: var(--moon); font-weight: 600; }
+
+    #equinox { padding: 104px 0; background: var(--dusk); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .pair { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 56px; align-items: center; }
+    .duo { display: flex; align-items: center; gap: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+    .duo figure { margin: 0; padding: 22px 26px; text-align: center; background: var(--card); }
+    .duo figure + figure { border-left: 1px solid var(--line); background: var(--night); }
+    .duo img { width: 96px; height: 96px; display: block; margin: 0 auto; }
+    .duo figcaption { margin-top: 10px; font-weight: 600; }
+    .duo figcaption small { display: block; font-weight: 400; color: var(--muted); font-size: 14px; }
+    .pair .sub { margin-bottom: 26px; }
+
+    #install { padding: 104px 0; }
+    .install { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 56px; align-items: start; }
+    ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; border-top: 1px solid var(--line); }
+    ol.steps li { counter-increment: s; display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 12px; padding: 20px 0; border-bottom: 1px solid var(--line); }
+    ol.steps li::before { content: counter(s); font-size: 28px; font-weight: 700; line-height: 1.1; color: var(--moon); }
+    ol.steps b { display: block; margin-bottom: 4px; }
+    ol.steps span { color: var(--muted); }
+    .tip { margin: 24px 0 0; color: var(--muted); font-size: 15px; }
+    code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .88em; background: var(--card); border: 1px solid var(--line); color: var(--text); padding: 1px 6px; border-radius: 6px; overflow-wrap: anywhere; }
+
+    footer { padding: 44px 0 56px; border-top: 1px solid var(--line); color: var(--muted); font-size: 15px; }
+    footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 18px 40px; }
+    footer p { margin: 0 0 6px; max-width: 680px; }
+    footer ul { display: flex; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    footer ul a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; }
+
+    @media (max-width: 900px) {
+      .hero .wrap, .controller, .perf, .more, .pair, .install { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+      .hero-mark { width: 180px; grid-row: 1; justify-self: start; }
+      header.hero { padding: 48px 0 64px; }
+      .more ul { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+      .perf-side { margin-top: 0; }
+      #controller, #performance, #equinox, #install { padding: 72px 0; }
+      #more { padding: 64px 0 48px; }
+      #compare { padding: 48px 0 72px; }
+    }
+    @media (max-width: 640px) {
+      .wrap { padding: 0 16px; }
+      nav.top ul li:not(:last-child) { display: none; }
+      .pad svg { width: 112px; height: 112px; }
+      .duo figure { padding: 18px 16px; }
+      .duo img { width: 72px; height: 72px; }
+      .btn { width: 100%; justify-content: center; }
+      .table-wrap { overflow: visible; }
+      table, tbody, tr, th, td { display: block; min-width: 0; width: 100%; }
+      thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+      tbody th { width: 100%; padding: 14px 16px 6px; border-bottom: 0; }
+      tbody td { position: relative; padding: 4px 16px 4px 110px; border-bottom: 0; }
+      tbody td.ours { padding-bottom: 14px; border-bottom: 1px solid var(--line); background: var(--card); }
+      tbody tr:last-child td.ours { border-bottom: 0; }
+      tbody td::before { content: attr(data-label); position: absolute; left: 16px; top: 6px; color: var(--muted); font-size: 14px; }
+      tbody td.ours::before { color: var(--moon); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="top" aria-label="Main">
+    <div class="wrap">
+      <a class="brand" href="#top"><img src="assets/logo.svg" width="32" height="32" alt="">Solstice</a>
+      <ul>
+        <li><a href="#controller">Controller</a></li>
+        <li><a href="#performance">Performance</a></li>
+        <li><a href="#compare">Compare</a></li>
+        <li><a href="#install">Install</a></li>
+        <li><a href="https://github.com/luizfbalves/Solstice">GitHub</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <header class="hero" id="top">
+    <div class="wrap">
+      <div>
+        <h1>Sunshine, made for streaming to the <span>Nintendo&nbsp;Switch</span>.</h1>
+        <p class="lead">Solstice is a fork of Sunshine for one setup: a Windows PC streaming to a Switch. Your games see a Switch 2 Pro
+          Controller with gyro and HD rumble, the stream can run on a virtual display at your Switch's exact mode, and the
+          GPU stays paced to the stream.</p>
+        <div class="cta">
+          <a class="btn btn-sun" href="https://github.com/luizfbalves/Solstice/releases/latest">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
+            Download the Windows installer</a>
+          <a class="btn btn-line" href="#compare">Compare with Sunshine</a>
+        </div>
+        <p class="fine">Free and open source under the GPL-3.0. Windows only. Not affiliated with LizardByte.</p>
+      </div>
+      <img class="hero-mark" src="assets/logo.svg" width="340" height="340" fetchpriority="high" alt="Solstice logo, half sun and half moon">
+    </div>
+  </header>
+
+  <main>
+    <section id="controller" aria-labelledby="controller-title">
+      <div class="wrap controller">
+        <div>
+          <h2 id="controller-title">Press A, and the game means your A.</h2>
+          <p class="sub">Upstream Sunshine shows Windows an Xbox or DualShock controller, so games prompt for the button in the wrong
+            spot. Solstice emulates a Switch 2 Pro Controller, and Steam and your games show Nintendo prompts.</p>
+          <ul class="points">
+            <li><b>Works with Secure Boot on.</b> <span>It runs on <a href="https://github.com/Alia5/VIIPER">libVIIPER</a> over the
+              Microsoft-signed <a href="https://github.com/vadimgrn/usbip-win2">usbip-win2</a> driver, so you never enable test signing.</span></li>
+            <li><b>Gyro and HD rumble work.</b> <span>Solstice forwards the gyro, accelerometer and both analog sticks to the game, and
+              sends HD rumble back to the Switch.</span></li>
+            <li><b>Buttons map by position.</b> <span>The east button is A on your Switch and A in the game.</span></li>
+            <li><b>Falls back to ViGEmBus.</b> <span>If VIIPER is not available, Solstice uses ViGEmBus instead.</span></li>
+          </ul>
+        </div>
+        <div class="pads" role="group" aria-label="What a game sees with each host">
+          <div class="pad">
+            <h3>Sunshine</h3>
+            <p>Windows sees an Xbox 360 pad</p>
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <g font-family="Onest, sans-serif" font-weight="700" font-size="15" text-anchor="middle" dominant-baseline="central">
+                <circle cx="50" cy="20" r="14" fill="#2b3163"/><text x="50" y="20" fill="#a9b0d4">Y</text>
+                <circle cx="80" cy="50" r="14" fill="#2b3163"/><text x="80" y="50" fill="#a9b0d4">B</text>
+                <circle cx="50" cy="80" r="14" fill="#2b3163"/><text x="50" y="80" fill="#a9b0d4">A</text>
+                <circle cx="20" cy="50" r="14" fill="#2b3163"/><text x="20" y="50" fill="#a9b0d4">X</text>
+              </g>
+            </svg>
+            <p class="says">"Press A" is the bottom button</p>
+          </div>
+          <div class="pad">
+            <h3>Solstice</h3>
+            <p>Windows sees a Switch 2 Pro Controller</p>
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <g font-family="Onest, sans-serif" font-weight="700" font-size="15" text-anchor="middle" dominant-baseline="central">
+                <circle cx="50" cy="20" r="14" fill="#9db8ff"/><text x="50" y="20" fill="#161a33">X</text>
+                <circle cx="80" cy="50" r="14" fill="#f4b860"/><text x="80" y="50" fill="#161a33">A</text>
+                <circle cx="50" cy="80" r="14" fill="#9db8ff"/><text x="50" y="80" fill="#161a33">B</text>
+                <circle cx="20" cy="50" r="14" fill="#9db8ff"/><text x="20" y="50" fill="#161a33">Y</text>
+              </g>
+            </svg>
+            <p class="says">"Press A" is the A on your Switch</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="performance" aria-labelledby="performance-title">
+      <div class="wrap perf">
+        <div>
+          <h2 id="performance-title">Sized and paced for the stream.</h2>
+          <p class="sub">Solstice can render at the exact resolution and refresh rate the client asks for, holds the GPU to the stream's
+            frame rate, and keeps streaming when a display blinks.</p>
+          <div class="perf-side">
+            <div>
+              <h3>NVIDIA frame limiter, matched to the stream</h3>
+              <p>While you stream, Solstice caps the NVIDIA driver's frame rate limiter to the stream's FPS. Your own setting
+                comes back when the stream ends.</p>
+            </div>
+            <div>
+              <h3>A blink of the display no longer ends the stream</h3>
+              <p>Solstice keeps your display modes when a display powers off, and keeps streaming through a display that drops
+                out for a moment.</p>
+            </div>
+          </div>
+        </div>
+        <div class="perf-main">
+          <h3>A virtual display at the client's exact mode</h3>
+          <p>Solstice can stream a virtual monitor created at the resolution and refresh rate the client asks for, using the
+            SudoVDA driver the installer adds. Your physical monitor stays as it is. If the driver is missing, Solstice streams
+            the physical monitor instead.</p>
+          <dl>
+            <dt>Driver</dt><dd><a href="https://github.com/SudoMaker/SudoVDA">SudoVDA</a>, installed with Solstice</dd>
+            <dt>Default</dt><dd>Off. Turn it on in the configuration or per application.</dd>
+            <dt>Uninstall</dt><dd>Removes only the device and certificate Solstice added</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <section id="more" aria-labelledby="more-title">
+      <div class="wrap more">
+        <h2 id="more-title">Also different.</h2>
+        <ul>
+          <li><h3>Gamepad type per game</h3><p>Pick Switch, Xbox 360 or DualShock 4 for each application. On <code>auto</code>, the
+            controller follows the layout chosen in the client.</p></li>
+          <li><h3>Applications as covers</h3><p>The web UI shows your applications as a cover grid, and one click finds every
+            missing cover.</p></li>
+          <li><h3>Updates from Solstice</h3><p>Update checks point to Solstice releases, so the UI never offers an upstream build that
+            would drop these features.</p></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="compare" aria-labelledby="compare-title">
+      <div class="wrap">
+        <h2 id="compare-title">Solstice next to Sunshine.</h2>
+        <p class="sub">Solstice follows upstream Sunshine and merges its changes. It gives up the other platforms to focus on
+          Windows and the Switch.</p>
+        <div class="table-wrap">
+          <table>
+            <caption>Feature comparison between Sunshine and Solstice</caption>
+            <thead>
+              <tr><th scope="col">Feature</th><th scope="col">Sunshine</th><th scope="col" class="ours">Solstice</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Platforms</th><td data-label="Sunshine">Windows, Linux, macOS, FreeBSD</td><td class="ours" data-label="Solstice">Windows</td></tr>
+              <tr><th scope="row">Emulated controller</th><td data-label="Sunshine">Xbox 360, DualShock 4</td><td class="ours" data-label="Solstice"><b>Switch 2 Pro Controller</b>, Xbox 360, DualShock 4</td></tr>
+              <tr><th scope="row">Nintendo button prompts in games</th><td data-label="Sunshine">No</td><td class="ours" data-label="Solstice"><b>Yes</b></td></tr>
+              <tr><th scope="row">Gamepad type per application</th><td data-label="Sunshine">No, one global setting</td><td class="ours" data-label="Solstice"><b>Yes</b>, or automatic from the client</td></tr>
+              <tr><th scope="row">Virtual display at the client's mode</th><td data-label="Sunshine">No</td><td class="ours" data-label="Solstice"><b>Yes</b>, with the bundled SudoVDA driver</td></tr>
+              <tr><th scope="row">NVIDIA frame limiter capped to stream FPS</th><td data-label="Sunshine">No</td><td class="ours" data-label="Solstice"><b>Yes</b></td></tr>
+              <tr><th scope="row">Stream survives a brief display loss</th><td data-label="Sunshine">No</td><td class="ours" data-label="Solstice"><b>Yes</b></td></tr>
+              <tr><th scope="row">Applications as a cover grid</th><td data-label="Sunshine">No</td><td class="ours" data-label="Solstice"><b>Yes</b>, with one-click covers</td></tr>
+              <tr><th scope="row">Connection test for the Switch client</th><td data-label="Sunshine">No</td><td class="ours" data-label="Solstice"><b>Yes</b>, with Equinox</td></tr>
+              <tr><th scope="row">Documentation and support</th><td data-label="Sunshine">Full docs, large community</td><td class="ours" data-label="Solstice">README, plus the Sunshine docs for the rest</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="equinox" aria-labelledby="equinox-title">
+      <div class="wrap pair">
+        <div class="duo">
+          <figure><img src="assets/logo.svg" width="96" height="96" alt=""><figcaption>Solstice<small>on your PC</small></figcaption></figure>
+          <figure><img src="assets/logo.svg" width="96" height="96" alt=""><figcaption>Equinox<small>on your Switch</small></figcaption></figure>
+        </div>
+        <div>
+          <h2 id="equinox-title">Made to pair with Equinox.</h2>
+          <p class="sub"><a href="https://github.com/luizfbalves/Equinox">Equinox</a> is the Switch client I build alongside Solstice,
+            and it shares the logo. It tests your connection against Solstice, recommends a bitrate and resolution, and lists your
+            PCs with the game each one is running. Solstice still works with any Moonlight client, and Equinox with Sunshine.</p>
+          <a class="btn btn-line" href="https://github.com/luizfbalves/Equinox/releases/latest">Download Equinox for the Switch</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="install" aria-labelledby="install-title">
+      <div class="wrap install">
+        <div>
+          <h2 id="install-title">Install.</h2>
+          <p class="sub">Three steps on the PC, one on the Switch.</p>
+          <p class="tip">Installing over a winget-managed Sunshine? Run <code>winget pin add --id LizardByte.Sunshine --blocking</code>
+            so <code>winget upgrade</code> does not replace Solstice.</p>
+        </div>
+        <ol class="steps">
+          <li><div><b>Install usbip-win2</b><span>From <a href="https://github.com/vadimgrn/usbip-win2/releases">its releases</a>, then
+            reboot if asked. Only needed for the Switch controller.</span></div></li>
+          <li><div><b>Install Solstice</b><span>Run <code>Sunshine-&lt;version&gt;-Windows-AMD64-installer.msi</code> from the
+            <a href="https://github.com/luizfbalves/Solstice/releases/latest">latest release</a>. libVIIPER is included.</span></div></li>
+          <li><div><b>Turn on the Switch controller</b><span>In the web UI, open Configuration, then Input, and set
+            <code>Gamepad driver</code> to <code>viiper</code> and <code>Emulated gamepad type</code> to <code>auto</code>.</span></div></li>
+          <li><div><b>Connect from the Switch</b><span>Use <a href="https://github.com/luizfbalves/Equinox">Equinox</a>, or Moonlight-Switch
+            1.5.3 or newer, and pick the Switch key mapping layout.</span></div></li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <div>
+        <p>Solstice is a personal fork of <a href="https://github.com/LizardByte/Sunshine">Sunshine</a> by LizardByte and its
+          contributors. Please support the original project.</p>
+        <p>Not affiliated with or endorsed by LizardByte, Nintendo or NVIDIA. Licensed under the GPL-3.0.</p>
+      </div>
+      <ul>
+        <li><a href="https://github.com/luizfbalves/Solstice">Source</a></li>
+        <li><a href="https://github.com/luizfbalves/Solstice/releases">Releases</a></li>
+      </ul>
+    </div>
+  </footer>
+</body>
+</html>
