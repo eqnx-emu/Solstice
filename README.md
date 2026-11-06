@@ -111,16 +111,6 @@ Solstice exists thanks to the work of others:
 * **[Onest](https://github.com/googlefonts/onest)**: the typeface of the Solstice wordmark, under the
   [SIL Open Font License](art/logo/onest_OFL.txt).
 
-### Sunshine contributors
-
-<p align="center">
-  <img src='https://cdn.jsdelivr.net/gh/LizardByte/contributors@dist/github.Sunshine.svg' alt="Sunshine GitHub contributors"/>
-</p>
-
-<p align="center">
-  <img src='https://cdn.jsdelivr.net/gh/LizardByte/contributors@dist/crowdin.606145.svg' alt="Sunshine CrowdIn contributors"/>
-</p>
-
 ## 📄 License
 
 Solstice is licensed under the [GNU General Public License v3.0](LICENSE), the same license as Sunshine. Third-party
