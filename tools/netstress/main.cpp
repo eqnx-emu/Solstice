@@ -3,7 +3,7 @@
  * @brief Borderless fullscreen window of random noise and a moving square, used to saturate the stream bitrate.
  * @details Launched by the synthetic "Solstice Network Test" app. Random noise is incompressible, so the encoder
  * spends its whole bitrate budget, which lets clients check the connection against the bitrate they selected.
- * Usage: `solstice-netstress.exe [--fps N]` (default 60). Esc or closing the window exits.
+ * Usage: `solstice-netstress.exe [--fps N]`. The frame rate is `--fps`, else `SUNSHINE_CLIENT_FPS`, else 60, clamped to 10-240. Esc or closing the window exits.
  */
 // standard includes
 #include <algorithm>
@@ -15,6 +15,9 @@
 #include <thread>
 #include <vector>
 
+// local includes
+#include "fps.h"
+
 // platform includes
 // clang-format off
 #include <windows.h>  // must precede shellapi.h
@@ -23,29 +26,27 @@
 // clang-format on
 
 namespace {
-  constexpr int default_fps = 60;  ///< Frame rate used when --fps is absent or invalid.
-  constexpr int max_fps = 240;  ///< Upper bound accepted for --fps.
-
   /**
-   * @brief Parse the optional `--fps N` command line argument.
+   * @brief Resolve the frame rate from `--fps N`, then `SUNSHINE_CLIENT_FPS`, then the default.
    *
-   * @return The requested frame rate, or default_fps.
+   * @return The frame rate in frames per second.
    */
   int parse_fps() {
-    int fps = default_fps;
+    std::string cli;
     int argc = 0;
     if (LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc); argv) {
       for (int i = 1; i + 1 < argc; ++i) {
         if (std::wcscmp(argv[i], L"--fps") == 0) {
-          const int value = static_cast<int>(std::wcstol(argv[i + 1], nullptr, 10));
-          if (value >= 1 && value <= max_fps) {
-            fps = value;
+          cli.clear();
+          for (const wchar_t *c = argv[i + 1]; *c; ++c) {
+            cli.push_back(*c < 128 ? static_cast<char>(*c) : '?');  // non-ASCII makes the value invalid
           }
         }
       }
       LocalFree(argv);
     }
-    return fps;
+    const char *env = std::getenv("SUNSHINE_CLIENT_FPS");
+    return netstress::resolve_fps(cli, env ? env : "");
   }
 
   /**
