@@ -276,6 +276,45 @@ $script:LogPath = $LogPath
 
 . (Join-Path $ScriptDir "sunshine-setup-process.ps1")
 
+# Run a SudoVDA driver script. Failure is logged and never fails the Sunshine setup,
+# because the virtual display feature falls back to the physical display without the driver.
+function Invoke-SudoVdaScript {
+    param(
+        [string]$ScriptName,
+        [string]$Description
+    )
+
+    $scriptPath = Join-Path $RootDir "drivers\sudovda\$ScriptName"
+    $powershellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    if (-not (Test-Path -LiteralPath $scriptPath)) {
+        Write-LogMessage -Message "$Description" -Level "Step"
+        Write-LogMessage -Message "  ⓘ Skipped (SudoVDA driver not bundled)" -Level "Information" -Color "DarkGray"
+        return
+    }
+    if (-not (Test-Path -LiteralPath $powershellExe)) {
+        Write-LogMessage -Message "$Description" -Level "Step"
+        Write-LogMessage -Message "  ⚠ powershell.exe not found at $powershellExe, SudoVDA step not run" -Level "Warning"
+        $script:SudoVdaFailed = $true
+        return
+    }
+    try {
+        $exitCode = Invoke-ExecutableIfExist `
+            -ExecutablePath $powershellExe `
+            -Arguments "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" `
+            -Description $Description `
+            -Emoji "🖥️" `
+            -ExecutableName "SudoVDA $ScriptName" `
+            -MissingTarget "powershell.exe" `
+            -FailureTarget $scriptPath
+        if ($exitCode -ne 0) {
+            $script:SudoVdaFailed = $true
+        }
+    } catch {
+        Write-LogMessage -Message "  ⚠ SudoVDA step failed: $($_.Exception.Message)" -Level "Warning"
+        $script:SudoVdaFailed = $true
+    }
+}
+
 # Main script logic
 Write-Information ""
 
@@ -286,7 +325,7 @@ if ($Action -eq "install") {
         -Color "Yellow"
     Write-Information ""
 
-    $totalSteps = 6
+    $totalSteps = 7
     $currentStep = 0
 
     # Reset permissions on the install directory
@@ -396,7 +435,17 @@ if ($Action -eq "install") {
         -Emoji "🛡️"
     Write-Information ""
 
-    # 4. Install service
+    # 4. Install the virtual display driver (optional, failures are only logged).
+    # This runs before the service is installed and started, so that Sunshine finds the driver when it starts.
+    $currentStep++
+    Write-Progress `
+        -Activity "Installing Sunshine" `
+        -Status "Installing virtual display driver" `
+        -PercentComplete (($currentStep / $totalSteps) * 100)
+    Invoke-SudoVdaScript -ScriptName "install.ps1" -Description "Installing virtual display driver (SudoVDA)"
+    Write-Information ""
+
+    # 5. Install service
     $currentStep++
     Write-Progress `
         -Activity "Installing Sunshine" `
@@ -409,7 +458,7 @@ if ($Action -eq "install") {
         -Emoji "⚡"
     Write-Information ""
 
-    # 5. Configure autostart
+    # 6. Configure autostart
     $currentStep++
     Write-Progress `
         -Activity "Installing Sunshine" `
@@ -424,6 +473,11 @@ if ($Action -eq "install") {
 
     Write-Progress -Activity "Installing Sunshine" -Completed
     Write-FramedText -Message "✓ Sunshine installation completed successfully!" -Level "Success"
+    if ($script:SudoVdaFailed) {
+        Write-LogMessage `
+            -Message "The virtual display driver (SudoVDA) was not installed. Streaming still works on the physical display. See the log: $LogPath" `
+            -Level "Warning"
+    }
 
     # Open documentation in browser (only if not running silently)
     if (-not $Silent) {
@@ -448,7 +502,7 @@ if ($Action -eq "install") {
         -Color "Yellow"
     Write-Information ""
 
-    $totalSteps = 4
+    $totalSteps = 5
     $currentStep = 0
 
     # 1. Delete firewall rules
@@ -477,7 +531,17 @@ if ($Action -eq "install") {
         -Emoji "⚡"
     Write-Information ""
 
-    # 3. Restore NVIDIA preferences
+    # 3. Remove the virtual display driver (failures are only logged).
+    # This runs after the service is stopped, so that Sunshine no longer holds the driver open.
+    $currentStep++
+    Write-Progress `
+        -Activity "Uninstalling Sunshine" `
+        -Status "Removing virtual display driver" `
+        -PercentComplete (($currentStep / $totalSteps) * 100)
+    Invoke-SudoVdaScript -ScriptName "uninstall.ps1" -Description "Removing virtual display driver (SudoVDA)"
+    Write-Information ""
+
+    # 4. Restore NVIDIA preferences
     $currentStep++
     Write-Progress `
         -Activity "Uninstalling Sunshine" `
@@ -489,7 +553,7 @@ if ($Action -eq "install") {
         -Emoji "🎮"
     Write-Information ""
 
-    # 4. Update PATH (remove)
+    # 5. Update PATH (remove)
     $currentStep++
     Write-Progress `
         -Activity "Uninstalling Sunshine" `
@@ -507,6 +571,11 @@ if ($Action -eq "install") {
     Write-FramedText `
         -Message "✓ Sunshine uninstallation completed successfully!" `
         -Level "Success"
+    if ($script:SudoVdaFailed) {
+        Write-LogMessage `
+            -Message "The virtual display driver (SudoVDA) could not be removed. Remove it in Device Manager if it is still listed. See the log: $LogPath" `
+            -Level "Warning"
+    }
 }
 
 Write-Information ""

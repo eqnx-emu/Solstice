@@ -725,3 +725,111 @@ TEST(DisplayDeviceRevert, RedockRestoresPendingSettings) {
   EXPECT_GE(manager_ptr->progress().revert_calls, 2);
   EXPECT_TRUE(wait_until_revert_stops());
 }
+
+TEST(DisplayDeviceRevert, ImmediateRevertRunsDespiteRevertDelay) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+  display_device::test_set_config_revert_delay(10s);
+  const auto persistence {display_device::test_make_watched_persistence()};
+  auto manager {std::make_unique<redock_settings_manager_t>(persistence)};
+  manager->set_keep_pending(false);
+  auto *manager_ptr {manager.get()};
+  display_device::test_install_settings_manager(std::move(manager), persistence);
+
+  EXPECT_TRUE(display_device::revert_configuration_now());
+  EXPECT_EQ(manager_ptr->progress().revert_calls, 1);
+  EXPECT_FALSE(display_device::test_revert_retry_is_scheduled());
+}
+
+TEST(DisplayDeviceRevert, ImmediateRevertReportsPendingRestores) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+  const auto persistence {display_device::test_make_watched_persistence()};
+  auto manager {std::make_unique<redock_settings_manager_t>(persistence)};
+  auto *manager_ptr {manager.get()};
+  display_device::test_install_settings_manager(std::move(manager), persistence);
+
+  EXPECT_FALSE(display_device::revert_configuration_now());
+  EXPECT_EQ(manager_ptr->progress().revert_calls, 1);
+  EXPECT_TRUE(manager_ptr->progress().pending_saved);
+}
+
+TEST(DisplayDeviceRevert, ImmediateRevertSucceedsWhenPlatformIsUnsupported) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+
+  EXPECT_TRUE(display_device::revert_configuration_now());
+}
+
+TEST(DisplayDeviceMapDisplayName, ReturnsDeviceIdOfGdiName) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+  const auto persistence {display_device::test_make_watched_persistence()};
+  auto manager {std::make_unique<redock_settings_manager_t>(persistence)};
+  manager->set_devices({
+    {.m_device_id = "panel", .m_display_name = R"(\.\DISPLAY1)", .m_friendly_name = "Panel"},
+    {.m_device_id = "{virtual}", .m_display_name = R"(\.\DISPLAY9)", .m_friendly_name = "Solstice"},
+  });
+  display_device::test_install_settings_manager(std::move(manager), persistence);
+
+  EXPECT_EQ(display_device::map_display_name(R"(\.\DISPLAY9)"), "{virtual}");
+  EXPECT_EQ(display_device::map_display_name(R"(\.\DISPLAY1)"), "panel");
+  EXPECT_EQ(display_device::map_display_name(R"(\.\DISPLAY5)"), "");
+}
+
+TEST(DisplayDeviceMapDisplayName, ReturnsInputWhenPlatformIsUnsupported) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+
+  EXPECT_EQ(display_device::map_display_name(R"(\.\DISPLAY9)"), R"(\.\DISPLAY9)");
+}
+
+TEST(DisplayDeviceConfigureNow, AppliesInTheCallingThread) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+  const auto persistence {display_device::test_make_watched_persistence()};
+  display_device::test_install_settings_manager(std::make_unique<redock_settings_manager_t>(persistence), persistence);
+  config::video_t video_config {};
+  video_config.dd.configuration_option = config_option_e::ensure_primary;
+  video_config.output_name = "panel";
+
+  EXPECT_TRUE(display_device::configure_display_now(video_config, {}, 1s));
+  EXPECT_FALSE(display_device::test_revert_retry_is_scheduled());
+}
+
+TEST(DisplayDeviceConfigureNow, ReplacesScheduledRevertRetries) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+  display_device::test_set_retry_interval(30ms);
+  const auto persistence {display_device::test_make_watched_persistence()};
+  display_device::test_install_settings_manager(std::make_unique<redock_settings_manager_t>(persistence), persistence);
+  display_device::revert_configuration();
+  ASSERT_TRUE(display_device::test_revert_retry_is_scheduled());
+  config::video_t video_config {};
+  video_config.dd.configuration_option = config_option_e::ensure_primary;
+  video_config.output_name = "panel";
+
+  EXPECT_TRUE(display_device::configure_display_now(video_config, {}, 1s));
+  EXPECT_FALSE(display_device::test_revert_retry_is_scheduled());
+}
+
+TEST(DisplayDeviceConfigureNow, FailsWhenConfigurationIsDisabled) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+  config::video_t video_config {};
+  video_config.dd.configuration_option = config_option_e::disabled;
+
+  EXPECT_FALSE(display_device::configure_display_now(video_config, {}, 1s));
+}
+
+TEST(DisplayDeviceConfigureNow, FailsWhenConfigurationCannotBeParsed) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+  config::video_t video_config {};
+  video_config.dd.configuration_option = config_option_e::ensure_primary;
+  video_config.dd.resolution_option = resolution_option_e::manual;
+  video_config.dd.manual_resolution = "not-a-resolution";
+  rtsp_stream::launch_session_t session {};
+  session.enable_sops = true;
+
+  EXPECT_FALSE(display_device::configure_display_now(video_config, session, 1s));
+}
+
+TEST(DisplayDeviceConfigureNow, SucceedsWhenPlatformIsUnsupported) {
+  [[maybe_unused]] const display_device_revert_guard_t guard;
+  config::video_t video_config {};
+  video_config.dd.configuration_option = config_option_e::ensure_primary;
+
+  EXPECT_TRUE(display_device::configure_display_now(video_config, {}, 1s));
+}

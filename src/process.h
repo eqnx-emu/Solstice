@@ -13,7 +13,9 @@
 #endif
 
 // standard includes
+#include <filesystem>
 #include <optional>
+#include <string_view>
 #include <unordered_map>
 
 // local includes
@@ -80,6 +82,7 @@ namespace proc {
     bool wait_all;  ///< Whether Sunshine waits for all child processes.
     std::chrono::seconds exit_timeout;  ///< Exit timeout.
     std::string gamepad;  ///< Gamepad type for this app, or empty to use the global setting.
+    std::string virtual_display;  ///< "enabled", "disabled", or empty to follow the global virtual display setting.
   };
 
   /**
@@ -140,6 +143,13 @@ namespace proc {
      */
     std::string get_app_image(int app_id);
     /**
+     * @brief Get the virtual display override of an application.
+     *
+     * @param app_id App ID.
+     * @return The app's "enabled" or "disabled" override, or an empty string when it follows the global setting or is unknown.
+     */
+    std::string get_app_virtual_display(int app_id) const;
+    /**
      * @brief Get last run app name.
      *
      * @return Name of the most recently launched application.
@@ -153,8 +163,12 @@ namespace proc {
     std::string get_running_app_gamepad() const;
     /**
      * @brief Terminate the launched application process.
+     *
+     * When an app had run, the display is restored with `virtual_display::end_or_revert()`.
+     *
+     * @return True when the display was restored, false when no app had run.
      */
-    void terminate();
+    bool terminate();
 
     /**
      * @brief Update the cached app list and environment without disturbing running process state.
@@ -229,11 +243,17 @@ namespace proc {
   void refresh(const std::string &file_name);
   /**
    * @brief Parse serialized text into the corresponding runtime representation.
+   * @details When `solstice-netstress.exe` is found, a synthetic "Solstice Network Test" app is appended.
    *
    * @param file_name File name.
+   * @param tools_dir Directory searched for `solstice-netstress.exe`, directly and in its `tools` subdirectory.
+   *                  Empty (the default) means the directory of the running executable. Tests pass a temporary
+   *                  directory here.
    * @return Parsed value or parse status.
    */
-  std::optional<proc::proc_t> parse(const std::string &file_name);
+  std::optional<proc::proc_t> parse(const std::string &file_name, const std::filesystem::path &tools_dir = {});
+
+  constexpr std::string_view network_test_app_name = "Solstice Network Test";  ///< Name clients use to find the synthetic connection test app.
 
   /**
    * @brief Normalize an application's gamepad type override.
@@ -242,6 +262,14 @@ namespace proc {
    * @return The override, or an empty string when the value is empty or unsupported.
    */
   std::string parse_app_gamepad(std::string_view value);
+
+  /**
+   * @brief Normalize an application's virtual display override.
+   *
+   * @param value Raw "virtual-display" value from apps.json.
+   * @return "enabled" or "disabled", or an empty string when the value is empty or unsupported.
+   */
+  std::string parse_app_virtual_display(std::string_view value);
 
   /**
    * @brief Initialize proc functions

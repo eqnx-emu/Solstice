@@ -54,6 +54,18 @@ namespace display_device {
   [[nodiscard]] std::string map_output_name(const std::string &output_name);
 
   /**
+   * @brief Map a platform display name (e.g. a Windows GDI display name) to its device id.
+   * @param display_name The platform display name.
+   * @returns The device id, an empty string if no available device has that name,
+   *          or the display name itself if the platform is not supported.
+   *
+   * @examples
+   * const auto device_id { map_display_name(gdi_display_name) };
+   * @examples_end
+   */
+  [[nodiscard]] std::string map_display_name(const std::string &display_name);
+
+  /**
    * @brief Ask the platform to wake displays before detection or capture.
    * @param display_name Platform capture selector.
    * @param timeout Maximum time to wait for platform-specific wake detection.
@@ -105,6 +117,28 @@ namespace display_device {
   void configure_display(const SingleDisplayConfiguration &config);
 
   /**
+   * @brief Configure the display device right now, in the calling thread, and report whether it worked.
+   *
+   * Unlike `configure_display()`, nothing is left scheduled: the configuration is applied in the calling thread,
+   * retried with short sleeps while `retry_window` lasts (a display that was just added may need a moment to
+   * become usable), and the outcome is returned. Like `configure_display()`, a scheduled configuration or revert
+   * retry is replaced, nothing else is cancelled.
+   *
+   * @param video_config User's video related configuration.
+   * @param session Session information.
+   * @param retry_window How long failed attempts are retried before giving up.
+   * @return True when the configuration was applied (or the platform is unsupported),
+   *         false when it is disabled, could not be parsed or kept failing.
+   *
+   * @examples
+   * if (!configure_display_now(config::video, *launch_session, std::chrono::seconds {3})) {
+   *   // fall back
+   * }
+   * @examples_end
+   */
+  [[nodiscard]] bool configure_display_now(const config::video_t &video_config, const rtsp_stream::launch_session_t &session, std::chrono::milliseconds retry_window);
+
+  /**
    * @brief Revert the display configuration and restore the previous state.
    *
    * In case the state could not be restored, by default it will be retried again in 5 seconds
@@ -117,6 +151,23 @@ namespace display_device {
    * @examples_end
    */
   void revert_configuration();
+
+  /**
+   * @brief Revert the display configuration right now, in the calling thread, ignoring the configured revert delay.
+   *
+   * Any scheduled configuration or revert retries are stopped first. Nothing is scheduled afterwards,
+   * so call `revert_configuration()` when this fails to keep retrying in the background.
+   *
+   * @return True when the previous state was fully restored (or the platform is unsupported),
+   *         false when the revert failed or settings for an unavailable display are still pending.
+   *
+   * @examples
+   * if (!revert_configuration_now()) {
+   *   revert_configuration();
+   * }
+   * @examples_end
+   */
+  [[nodiscard]] bool revert_configuration_now();
 
   /**
    * @brief Reset persisted display state and the captured initial state.
@@ -204,13 +255,19 @@ namespace display_device {
   void test_set_retry_interval(std::chrono::milliseconds interval);
 
   /**
+   * @brief Override the delay before the first scheduled revert attempt (normally `dd.config_revert_delay`).
+   * @param delay Delay before the first attempt. Zero runs the first attempt immediately.
+   */
+  void test_set_config_revert_delay(std::chrono::milliseconds delay);
+
+  /**
    * @brief Report whether another revert attempt is still scheduled.
    * @return True when the revert scheduler will run again.
    */
   [[nodiscard]] bool test_revert_retry_is_scheduled();
 
   /**
-   * @brief Stop the revert scheduler and drop the test settings manager.
+   * @brief Stop the revert scheduler, drop the test settings manager and clear the test delay overrides.
    */
   void test_reset_display_device();
 #endif

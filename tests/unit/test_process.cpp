@@ -27,9 +27,15 @@
 #endif
 
 // local includes
+#include <src/config.h>
 #include <src/process.h>
 #include <src/process_gamepad.h>
 #include <src/utility.h>
+#include <src/virtual_display.h>
+
+// test includes
+// Included after boost.process: the support header pulls in Windows headers that break boost.asio when first.
+#include "virtual_display_test_support.h"
 
 namespace fs = std::filesystem;
 
@@ -900,4 +906,171 @@ TEST_F(ProcessRefreshTest, RunningAppGamepadFollowsTheLaunchedApp) {
 
 TEST_F(ProcessUpdateTest, GlobalRunningAppGamepadReadsTheGlobalProcess) {
   EXPECT_EQ(proc::running_app_gamepad(), "");
+}
+
+TEST(ProcessTest, ParseAppVirtualDisplay) {
+  EXPECT_EQ(proc::parse_app_virtual_display("enabled"), "enabled");
+  EXPECT_EQ(proc::parse_app_virtual_display("disabled"), "disabled");
+  EXPECT_EQ(proc::parse_app_virtual_display(""), "");
+  EXPECT_EQ(proc::parse_app_virtual_display("bogus"), "");
+}
+
+TEST_F(ProcessRefreshTest, Parse_ReadsAppVirtualDisplayOverride) {
+  const fs::path apps_file = test_dir / "apps_virtual_display.json";
+  {
+    std::ofstream file(apps_file);
+    file << R"({ "env": {}, "apps": [
+      { "name": "OnGame", "virtual-display": "enabled" },
+      { "name": "OffGame", "virtual-display": "disabled" },
+      { "name": "DefaultGame" },
+      { "name": "BadGame", "virtual-display": "bogus" }
+    ] })";
+  }
+
+  auto parsed = proc::parse(apps_file.string());
+
+  ASSERT_TRUE(parsed.has_value());
+  const auto &apps = parsed->get_apps();
+  ASSERT_EQ(apps.size(), 4u);
+  EXPECT_EQ(apps[0].virtual_display, "enabled");
+  EXPECT_EQ(apps[1].virtual_display, "disabled");
+  EXPECT_EQ(apps[2].virtual_display, "");
+  EXPECT_EQ(apps[3].virtual_display, "");
+}
+
+TEST_F(ProcessRefreshTest, GetAppVirtualDisplayFindsTheAppById) {
+  boost::process::v1::environment env = boost::this_process::environment();
+  std::vector<proc::ctx_t> apps;
+  proc::ctx_t ctx;
+  ctx.name = "VdGame";
+  ctx.id = "42";
+  ctx.virtual_display = "enabled";
+  apps.push_back(std::move(ctx));
+  proc::proc_t target(std::move(env), std::move(apps));
+
+  EXPECT_EQ(target.get_app_virtual_display(42), "enabled");
+  EXPECT_EQ(target.get_app_virtual_display(43), "");
+}
+
+/**
+ * @brief Fixture for parse() tests that exercise the synthetic network test app.
+ */
+class ProcParse: public ProcessRefreshTest {};
+
+TEST_F(ProcParse, AddsNetworkTestAppWhenToolPresent) {
+  const fs::path tools_dir = test_dir / "netstress_present";
+  fs::create_directories(tools_dir);
+  { std::ofstream(tools_dir / "solstice-netstress.exe") << "stub"; }
+  const fs::path apps_file = test_dir / "apps_netstress.json";
+  writeAppsJson(apps_file, {"Game"});
+
+  auto parsed = proc::parse(apps_file.string(), tools_dir);
+
+  ASSERT_TRUE(parsed.has_value());
+  const auto &apps = parsed->get_apps();
+  ASSERT_EQ(apps.size(), 2u);
+  EXPECT_EQ(apps[0].name, "Game");
+  EXPECT_EQ(apps[1].name, "Solstice Network Test");
+  EXPECT_FALSE(apps[1].id.empty());
+  EXPECT_NE(apps[1].id, apps[0].id);
+  EXPECT_EQ(apps[1].image_path, "");
+  EXPECT_NE(apps[1].cmd.find("solstice-netstress.exe"), std::string::npos);
+  EXPECT_FALSE(apps[1].elevated);
+
+  auto reparsed = proc::parse(apps_file.string(), tools_dir);
+  ASSERT_TRUE(reparsed.has_value());
+  EXPECT_EQ(reparsed->get_apps()[1].id, apps[1].id);
+}
+
+TEST_F(ProcParse, AddsNetworkTestAppFromToolsSubdirectory) {
+  const fs::path base_dir = test_dir / "netstress_subdir";
+  fs::create_directories(base_dir / "tools");
+  { std::ofstream(base_dir / "tools" / "solstice-netstress.exe") << "stub"; }
+  const fs::path apps_file = test_dir / "apps_netstress_sub.json";
+  writeAppsJson(apps_file, {"Game"});
+
+  auto parsed = proc::parse(apps_file.string(), base_dir);
+
+  ASSERT_TRUE(parsed.has_value());
+  EXPECT_EQ(parsed->get_apps().size(), 2u);
+}
+
+TEST_F(ProcParse, OmitsNetworkTestAppWhenToolAbsent) {
+  const fs::path tools_dir = test_dir / "netstress_absent";
+  fs::create_directories(tools_dir);
+  const fs::path apps_file = test_dir / "apps_no_netstress.json";
+  writeAppsJson(apps_file, {"Game"});
+
+  auto parsed = proc::parse(apps_file.string(), tools_dir);
+
+  ASSERT_TRUE(parsed.has_value());
+  ASSERT_EQ(parsed->get_apps().size(), 1u);
+  EXPECT_EQ(parsed->get_apps()[0].name, "Game");
+}
+
+TEST(VirtualDisplayTest, ShouldUseVirtualDisplay) {
+  using enum config::video_t::virtual_display_e;
+  // The global "disabled" is a master switch that also ignores per-app "enabled".
+  EXPECT_FALSE(virtual_display::should_use(disabled, "enabled"));
+  EXPECT_TRUE(virtual_display::should_use(apps, "enabled"));
+  EXPECT_TRUE(virtual_display::should_use(always, "enabled"));
+  EXPECT_FALSE(virtual_display::should_use(disabled, "disabled"));
+  EXPECT_FALSE(virtual_display::should_use(apps, "disabled"));
+  EXPECT_FALSE(virtual_display::should_use(always, "disabled"));
+  EXPECT_FALSE(virtual_display::should_use(disabled, ""));
+  EXPECT_FALSE(virtual_display::should_use(apps, ""));
+  EXPECT_TRUE(virtual_display::should_use(always, ""));
+}
+
+namespace {
+  using virtual_display_test::make_session;
+  using virtual_display_test::physical_device_id;
+}  // namespace
+
+/**
+ * @brief Fixture that runs a Desktop-style app on the global process registry over a fake virtual display.
+ *
+ * `proc_t::terminate` consults the global registry for the last app name, so the global instance is required.
+ */
+class ProcTerminate: public VirtualDisplay {
+protected:
+  void SetUp() override {
+    VirtualDisplay::SetUp();
+    proc::ctx_t app {};
+    app.id = "42";
+    app.name = "Desktop";
+    app.virtual_display = "enabled";
+    proc::proc.get_apps().push_back(std::move(app));
+  }
+
+  void TearDown() override {
+    proc::proc.terminate();
+    proc::proc.get_apps().clear();
+    VirtualDisplay::TearDown();
+  }
+};
+
+TEST_F(ProcTerminate, EndsVirtualDisplay) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, proc::proc.get_app_virtual_display(42), virtual_display::start_e::launch));
+  ASSERT_EQ(proc::proc.execute(42, std::make_shared<rtsp_stream::launch_session_t>()), 0);
+  ASSERT_TRUE(virtual_display::active());
+
+  proc::proc.terminate();
+
+  EXPECT_FALSE(virtual_display::active());
+  // One removal of a possible leftover before creating, one at the end.
+  ASSERT_EQ(backend->removed.size(), 2);
+  EXPECT_EQ(config::video.output_name, physical_device_id);
+}
+
+TEST_F(ProcTerminate, KeepsVirtualDisplayWithoutARunningApp) {
+  auto session {make_session(1280, 720, 60)};
+  ASSERT_TRUE(virtual_display::begin(*session, "enabled", virtual_display::start_e::launch));
+
+  proc::proc.terminate();
+
+  EXPECT_TRUE(virtual_display::active());
+  // Only the removal of a possible leftover before creating.
+  EXPECT_EQ(backend->removed.size(), 1);
 }

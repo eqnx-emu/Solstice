@@ -36,6 +36,7 @@
 #include "process_gamepad.h"
 #include "system_tray.h"
 #include "utility.h"
+#include "virtual_display.h"
 
 #ifdef _WIN32
   // from_utf8() string conversion function
@@ -43,6 +44,9 @@
 
   // _SH constants for _wfsopen()
   #include <share.h>
+
+  // GetModuleFileNameW() to locate the network stress tool next to the executable
+  #include <windows.h>
 #endif
 
 namespace proc {
@@ -369,7 +373,7 @@ namespace proc {
     return 0;
   }
 
-  void proc_t::terminate() {
+  bool proc_t::terminate() {
     input::terminate_gamepads();
     std::error_code ec;
     placebo = false;
@@ -406,6 +410,7 @@ namespace proc {
     _pipe.reset();
 
     bool has_run = _app_id > 0;
+    bool restored = false;
 
     // Only show the Stopped notification if we actually have an app to stop
     // Since terminate() is always run when a new app has started
@@ -414,10 +419,12 @@ namespace proc {
       system_tray::update_tray_stopped(proc::proc.get_last_run_app_name());
 #endif
 
-      display_device::revert_configuration();
+      virtual_display::end_or_revert();
+      restored = true;
     }
 
     _app_id = -1;
+    return restored;
   }
 
   const std::vector<ctx_t> &proc_t::get_apps() const {
@@ -445,6 +452,13 @@ namespace proc {
     return _app.name;
   }
 
+  std::string proc_t::get_app_virtual_display(int app_id) const {
+    const auto iter = std::ranges::find_if(_apps, [app_id](const auto &app) {
+      return app.id == std::to_string(app_id);
+    });
+    return iter == _apps.end() ? std::string {} : iter->virtual_display;
+  }
+
   std::string proc_t::get_running_app_gamepad() const {
     if (_app_id <= 0 && !placebo) {
       return {};
@@ -464,6 +478,17 @@ namespace proc {
       return std::string {value};
     }
     BOOST_LOG(warning) << "Ignoring unsupported app gamepad type: "sv << value;
+    return {};
+  }
+
+  std::string parse_app_virtual_display(std::string_view value) {
+    if (value.empty()) {
+      return {};
+    }
+    if (value == "enabled"sv || value == "disabled"sv) {
+      return std::string {value};
+    }
+    BOOST_LOG(warning) << "Ignoring unsupported app virtual-display value: "sv << value;
     return {};
   }
 
@@ -748,10 +773,43 @@ namespace proc {
     return std::make_tuple(id_no_index, id_with_index);
   }
 
+  namespace {
+    constexpr auto netstress_exe_name = "solstice-netstress.exe"sv;  ///< File name of the network stress tool.
+
+    /**
+     * @brief Find the network stress tool.
+     *
+     * @param tools_dir Directory to search, or empty for the directory of the running executable.
+     * @return Path of the tool, or an empty path when it is not installed.
+     */
+    std::filesystem::path find_netstress(const std::filesystem::path &tools_dir) {
+      std::filesystem::path base = tools_dir;
+#ifdef _WIN32
+      if (base.empty()) {
+        std::array<WCHAR, MAX_PATH> executable {};
+        if (GetModuleFileNameW(nullptr, executable.data(), executable.size()) != 0) {
+          base = std::filesystem::path {executable.data()}.parent_path();
+        }
+      }
+#endif
+      if (base.empty()) {
+        return {};
+      }
+
+      std::error_code ec;
+      for (const auto &candidate : {base / netstress_exe_name, base / "tools" / netstress_exe_name}) {
+        if (std::filesystem::is_regular_file(candidate, ec)) {
+          return candidate;
+        }
+      }
+      return {};
+    }
+  }  // namespace
+
   /**
    * @brief Parse serialized text into the corresponding runtime representation.
    */
-  std::optional<proc::proc_t> parse(const std::string &file_name) {
+  std::optional<proc::proc_t> parse(const std::string &file_name, const std::filesystem::path &tools_dir) {
     pt::ptree tree;
 
     try {
@@ -785,6 +843,7 @@ namespace proc {
         auto wait_all = app_node.get_optional<bool>("wait-all"s);
         auto exit_timeout = app_node.get_optional<int>("exit-timeout"s);
         auto gamepad = app_node.get_optional<std::string>("gamepad"s);
+        auto virtual_display = app_node.get_optional<std::string>("virtual-display"s);
 
         std::vector<proc::cmd_t> prep_cmds;
         if (!exclude_global_prep.value_or(false)) {
@@ -855,6 +914,7 @@ namespace proc {
         ctx.wait_all = wait_all.value_or(true);
         ctx.exit_timeout = std::chrono::seconds {exit_timeout.value_or(5)};
         ctx.gamepad = parse_app_gamepad(gamepad.value_or(""));
+        ctx.virtual_display = parse_app_virtual_display(virtual_display.value_or(""));
 
         auto possible_ids = calculate_app_id(name, ctx.image_path, i++);
         if (ids.count(std::get<0>(possible_ids)) == 0) {
@@ -869,6 +929,31 @@ namespace proc {
         ctx.name = std::move(name);
         ctx.prep_cmds = std::move(prep_cmds);
         ctx.detached = std::move(detached);
+
+        apps.emplace_back(std::move(ctx));
+      }
+
+      if (const auto netstress = find_netstress(tools_dir); !netstress.empty()) {
+        // Synthetic app for the client's connection test; it only exists here, never in apps.json.
+        proc::ctx_t ctx;
+        ctx.name = std::string {network_test_app_name};
+#ifdef _WIN32
+        // ctx.cmd is UTF-8 everywhere else (apps.json); convert the native wide path the same way.
+        const auto netstress_utf8 = utf_utils::to_utf8(netstress.wstring());
+        ctx.working_dir = utf_utils::to_utf8(netstress.parent_path().wstring());
+#else
+        const auto netstress_utf8 = netstress.string();
+        ctx.working_dir = netstress.parent_path().string();
+#endif
+        ctx.cmd = "\"" + netstress_utf8 + "\"";
+        ctx.elevated = false;
+        ctx.auto_detach = false;
+        ctx.wait_all = true;
+        ctx.exit_timeout = std::chrono::seconds {5};
+
+        auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
+        ctx.id = ids.count(std::get<0>(possible_ids)) == 0 ? std::get<0>(possible_ids) : std::get<1>(possible_ids);
+        ids.insert(ctx.id);
 
         apps.emplace_back(std::move(ctx));
       }

@@ -37,6 +37,7 @@ extern "C" {
 #include "system_tray.h"
 #include "thread_safe.h"
 #include "utility.h"
+#include "virtual_display.h"
 
 constexpr int IDX_START_A = 0;  ///< Control-stream message index for the first stream-start packet.
 constexpr int IDX_START_B = 1;  ///< Control-stream message index for the second stream-start packet.
@@ -2322,7 +2323,8 @@ namespace stream {
       // If this is the last session, invoke the platform callbacks
       if (--running_sessions == 0) {
         bool revert_display_config {config::video.dd.config_revert_on_disconnect};
-        if (proc::proc.running()) {
+        const bool app_running {proc::proc.running() != 0};
+        if (app_running) {
 #if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
           system_tray::update_tray_pausing(proc::proc.get_last_run_app_name());
 #endif
@@ -2333,7 +2335,10 @@ namespace stream {
         }
 
         if (revert_display_config) {
-          display_device::revert_configuration();
+          // A plain revert would undo the virtual display configuration while the monitor still exists,
+          // so with the app still running keep both for the next resume. This session still counts as
+          // running, so ending the virtual display is deferred to session_stopped() below.
+          virtual_display::end_or_revert(app_running);
         }
 
         platf::streaming_will_stop();
@@ -2344,6 +2349,10 @@ namespace stream {
         }
 #endif
       }
+
+      // The capture threads are gone. A virtual display teardown deferred until now runs on a background worker,
+      // outside of the hang watchdog above.
+      virtual_display::session_stopped();
 
       BOOST_LOG(debug) << "Session ended"sv;
     }
@@ -2377,8 +2386,15 @@ namespace stream {
 
       session.pingTimeout = std::chrono::steady_clock::now() + config::stream.ping_timeout;
 
+      // Keeps the virtual display alive while the capture threads run; balanced by session_stopped() in join().
+      virtual_display::session_started();
+      // A session whose threads fail to start never reaches join(), so balance the count here.
+      auto unbalanced_session {util::fail_guard([]() {
+        virtual_display::session_stopped();
+      })};
       session.audioThread = std::jthread {audioThread, &session};
       session.videoThread = std::jthread {videoThread, &session};
+      unbalanced_session.disable();
 
       session.state.store(state_e::RUNNING, std::memory_order_relaxed);
 

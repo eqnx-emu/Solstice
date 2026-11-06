@@ -19,3 +19,29 @@ Motion Picture Experts Group (MPEG-LA) and/or any other necessary licensing requ
 In summary, while Sunshine is free to use, it is the user's responsibility to ensure compliance with all applicable
 licensing requirements when redistributing the software as part of a commercial offering. If you have any questions or
 concerns about using Sunshine in a commercial setting, we recommend consulting with a lawyer.
+
+## Third-Party Notices
+
+### SudoVDA
+
+The virtual display backend uses the SudoVDA driver interface headers (`third-party/sudovda`), created by
+[SudoMaker](https://github.com/SudoMaker/SudoVDA) and taken from the
+[Apollo](https://github.com/ClassicOldSong/Apollo) project (GPL-3.0). The backend in
+`src/platform/windows/virtual_display.cpp` is adapted from Apollo's SudoVDA integration.
+
+The Windows package also bundles the SudoVDA driver binaries (`drivers/sudovda`). SudoVDA is based on the Microsoft
+IndirectDisplay sample and is licensed by its author under "MIT and CC0 or Public Domain ... choose the least
+restrictive option" (its repository ships no separate license file; see `src_assets/windows/drivers/sudovda/LICENSE`).
+SudoVDA publishes no binary releases, so the signed `SudoVDA.dll` is extracted at build time from the
+[Apollo](https://github.com/ClassicOldSong/Apollo) v0.4.6 release installer, pinned by checksum.
+The driver is installed with [nefcon](https://github.com/nefarius/nefcon) (`nefconc.exe`, MIT License).
+
+The installer adds `sudovda.cer` to the machine **Root** and **TrustedPublisher** certificate stores so Windows accepts
+the driver. Other software, such as Apollo, ships the same driver and certificate, so the installer records in
+`HKLM\SOFTWARE\Solstice\SudoVDA` what it added itself: the device node it created, and each store the certificate
+was not already in. Uninstalling removes only the recorded device node. It removes the certificate from a recorded
+store only when that node is gone and no SudoVDA device node is left; otherwise the certificate is kept and the
+uninstall log gives the reason. If the certificate is kept and you want to remove it, run from an elevated prompt
+(`certutil -dump sudovda.cer` shows the thumbprint, labelled `Cert Hash(sha1)`):
+`certutil -delstore Root <thumbprint>` and `certutil -delstore TrustedPublisher <thumbprint>`.
+Removing it while another product's SudoVDA driver is installed stops Windows from trusting that driver.

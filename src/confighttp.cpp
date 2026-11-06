@@ -1203,6 +1203,10 @@ namespace confighttp {
         input_tree.erase("gamepad");
       }
 
+      if (input_tree.contains("virtual-display") && input_tree["virtual-display"].is_string() && input_tree["virtual-display"].get<std::string>().empty()) {
+        input_tree.erase("virtual-display");
+      }
+
       auto &apps_node = file_tree["apps"];
       int index = input_tree["index"].get<int>();  // this will intentionally cause an exception if the provided value is the wrong type
 

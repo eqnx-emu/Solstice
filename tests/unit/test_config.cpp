@@ -258,6 +258,28 @@ TEST_F(ConfigPersistenceTest, ParsesViiperGamepadDriver) {
 #endif
 
 /**
+ * @brief Verify the virtual display option defaults to disabled and rejects unknown values.
+ */
+TEST_F(ConfigPersistenceTest, ParsesVirtualDisplayOption) {
+  const auto apps_file = config_file().parent_path() / "sunshine_test_config_apps.json";
+  ASSERT_EQ(file_handler::write_file(apps_file.string().c_str(), "{}"), 0);
+  config::stream.file_apps = apps_file.string();
+
+  config::apply_config_for_test("virtual_display = always\n");
+  EXPECT_EQ(config::video.virtual_display, config::video_t::virtual_display_e::always);
+
+  config::apply_config_for_test("virtual_display = apps\n");
+  EXPECT_EQ(config::video.virtual_display, config::video_t::virtual_display_e::apps);
+
+  config::apply_config_for_test("virtual_display = disabled\n");
+  EXPECT_EQ(config::video.virtual_display, config::video_t::virtual_display_e::disabled);
+
+  config::apply_config_for_test("virtual_display = always\n");
+  config::apply_config_for_test("virtual_display = bogus\n");
+  EXPECT_EQ(config::video.virtual_display, config::video_t::virtual_display_e::disabled);
+}
+
+/**
  * @brief Verify mixed-case boolean values update configuration correctly.
  */
 TEST_F(ConfigPersistenceTest, ParsesBooleanOptionsCaseInsensitively) {

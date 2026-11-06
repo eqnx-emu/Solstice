@@ -45,6 +45,7 @@
 #include "system_tray.h"
 #include "upnp.h"
 #include "video.h"
+#include "virtual_display.h"
 
 using namespace std::literals;
 
@@ -295,6 +296,10 @@ int main(int argc, char *argv[]) {
   if (!display_device_deinit_guard) {
     BOOST_LOG(error) << "Display device session failed to initialize"sv;
   }
+
+  // Cleans up a virtual display left by a crash (opening the driver only then, otherwise on first use); never fails startup.
+  // Runs after display_device::init so a display configuration persisted by a crash can be reverted against the re-created display.
+  virtual_display::init(platf::appdata() / "virtual_display.state");
 
 #ifdef _WIN32
   // Modify relevant NVIDIA control panel settings if the system has corresponding gpu
@@ -560,6 +565,9 @@ int main(int argc, char *argv[]) {
   httpThread.join();
   configThread.join();
   rtspThread.join();
+
+  // The stream sessions are gone: run a virtual display teardown that is still pending before shutting down.
+  virtual_display::shutdown();
 
   task_pool.stop();
   task_pool.join();
