@@ -33,3 +33,8 @@ The Windows package also bundles the SudoVDA driver binaries (`drivers/sudovda`)
 IndirectDisplay sample and is licensed by its author under "MIT and CC0 or Public Domain ... choose the least
 restrictive option" (its repository ships no separate license file; see `src_assets/windows/drivers/sudovda/LICENSE`).
 The driver is installed with [nefcon](https://github.com/nefarius/nefcon) (`nefconc.exe`, MIT License).
+
+The installer adds `sudovda.cer` to the machine **Root** and **TrustedPublisher** certificate stores so Windows accepts
+the driver. Uninstalling removes only the device node, not the certificate. To remove it manually, run from an elevated
+prompt (use `certutil -dump sudovda.cer` for the serial number or hash):
+`certutil -delstore root <serial-or-hash>` and `certutil -delstore TrustedPublisher <serial-or-hash>`.

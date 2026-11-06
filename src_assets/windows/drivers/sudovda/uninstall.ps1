@@ -14,9 +14,13 @@ if (-not (Test-Path -LiteralPath $Nefcon)) {
 }
 
 Write-Host "Executing: $Nefcon --remove-device-node --hardware-id $HardwareId --class-guid $ClassGuid"
-& $Nefcon --remove-device-node --hardware-id $HardwareId --class-guid $ClassGuid 2>&1 | ForEach-Object { Write-Host "  $_" }
-if ($LASTEXITCODE -ne 0) {
+# Native stderr must not become a terminating error under Windows PowerShell 5.1.
+$ErrorActionPreference = 'Continue'
+$output = & $Nefcon --remove-device-node --hardware-id $HardwareId --class-guid $ClassGuid 2>&1
+$code = $LASTEXITCODE
+$output | ForEach-Object { Write-Host "  $_" }
+if ($code -ne 0) {
     # A missing node (already removed) also reports an error; do not fail the uninstall.
-    Write-Warning "nefconc.exe exited with code $LASTEXITCODE (device node may already be removed)"
+    Write-Warning "nefconc.exe exited with code $code (device node may already be removed)"
 }
 exit 0

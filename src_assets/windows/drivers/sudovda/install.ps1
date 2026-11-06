@@ -20,8 +20,17 @@ $Certutil = Join-Path $env:SystemRoot 'System32\certutil.exe'
 function Invoke-Checked {
     param([string]$FilePath, [string[]]$Arguments, [switch]$AllowFailure)
     Write-Host "Executing: $FilePath $($Arguments -join ' ')"
-    & $FilePath @Arguments 2>&1 | ForEach-Object { Write-Host "  $_" }
-    $code = $LASTEXITCODE
+    # Windows PowerShell 5.1 turns native stderr into a terminating error under 'Stop'.
+    # Success is judged by the exit code only.
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = & $FilePath @Arguments 2>&1
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+    $output | ForEach-Object { Write-Host "  $_" }
     if ($code -ne 0) {
         if ($AllowFailure) {
             Write-Warning "$FilePath exited with code $code (ignored)"

@@ -285,14 +285,20 @@ function Invoke-SudoVdaScript {
     )
 
     $scriptPath = Join-Path $RootDir "drivers\sudovda\$ScriptName"
-    $powershellExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell1.0\powershell.exe"
+    $powershellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     if (-not (Test-Path -LiteralPath $scriptPath)) {
         Write-LogMessage -Message "$Description" -Level "Step"
         Write-LogMessage -Message "  ⓘ Skipped (SudoVDA driver not bundled)" -Level "Information" -Color "DarkGray"
         return
     }
+    if (-not (Test-Path -LiteralPath $powershellExe)) {
+        Write-LogMessage -Message "$Description" -Level "Step"
+        Write-LogMessage -Message "  ⚠ powershell.exe not found at $powershellExe, SudoVDA step not run" -Level "Warning"
+        $script:SudoVdaFailed = $true
+        return
+    }
     try {
-        $null = Invoke-ExecutableIfExist `
+        $exitCode = Invoke-ExecutableIfExist `
             -ExecutablePath $powershellExe `
             -Arguments "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" `
             -Description $Description `
@@ -300,8 +306,12 @@ function Invoke-SudoVdaScript {
             -ExecutableName "SudoVDA $ScriptName" `
             -MissingTarget "powershell.exe" `
             -FailureTarget $scriptPath
+        if ($exitCode -ne 0) {
+            $script:SudoVdaFailed = $true
+        }
     } catch {
         Write-LogMessage -Message "  ⚠ SudoVDA step failed: $($_.Exception.Message)" -Level "Warning"
+        $script:SudoVdaFailed = $true
     }
 }
 
@@ -462,6 +472,11 @@ if ($Action -eq "install") {
 
     Write-Progress -Activity "Installing Sunshine" -Completed
     Write-FramedText -Message "✓ Sunshine installation completed successfully!" -Level "Success"
+    if ($script:SudoVdaFailed) {
+        Write-LogMessage `
+            -Message "The virtual display driver (SudoVDA) was not installed. Streaming still works on the physical display. See the log: $LogPath" `
+            -Level "Warning"
+    }
 
     # Open documentation in browser (only if not running silently)
     if (-not $Silent) {
@@ -554,6 +569,11 @@ if ($Action -eq "install") {
     Write-FramedText `
         -Message "✓ Sunshine uninstallation completed successfully!" `
         -Level "Success"
+    if ($script:SudoVdaFailed) {
+        Write-LogMessage `
+            -Message "The virtual display driver (SudoVDA) could not be removed. Remove it in Device Manager if it is still listed. See the log: $LogPath" `
+            -Level "Warning"
+    }
 }
 
 Write-Information ""

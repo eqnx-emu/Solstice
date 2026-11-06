@@ -49,6 +49,8 @@ below, the [Sunshine documentation](https://docs.lizardbyte.dev/projects/sunshin
 * Optionally streams a dedicated virtual monitor at the exact resolution and refresh rate the client asked for, using the
   bundled [SudoVDA](https://github.com/SudoMaker/SudoVDA) driver (installed by the Windows installer). Off by default;
   falls back to the physical display if the driver is missing.
+* The installer adds the driver certificate (`sudovda.cer`) to the machine Root and TrustedPublisher stores.
+  Uninstall removes only the device node; `docs/legal.md` shows how to remove the certificate manually.
 
 ### 🌐 Web UI
 
