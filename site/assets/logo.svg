@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Solstice mark: the same half sun, half moon as Equinox. render_logo.py draws these shapes into every icon. -->
+  <g stroke="#f4b860" stroke-width="5" stroke-linecap="round">
+    <line x1="14" y1="50" x2="4" y2="50"/>
+    <line x1="21.7" y1="27" x2="14.6" y2="19.9"/>
+    <line x1="21.7" y1="73" x2="14.6" y2="80.1"/>
+    <line x1="47" y1="10" x2="47" y2="2"/>
+    <line x1="47" y1="90" x2="47" y2="98"/>
+  </g>
+  <path d="M47 20 A30 30 0 0 0 47 80 Z" fill="#f4b860"/>
+  <path d="M53 20 A30 30 0 0 1 53 80 Z" fill="#9db8ff"/>
+  <circle cx="62" cy="38" r="4" fill="#161a33" opacity="0.35"/>
+  <circle cx="66" cy="60" r="6" fill="#161a33" opacity="0.25"/>
+  <path d="M88 22 l1.6 4 4 1.6 -4 1.6 -1.6 4 -1.6 -4 -4 -1.6 4 -1.6 z" fill="#9db8ff"/>
+  <circle cx="92" cy="72" r="2.2" fill="#9db8ff"/>
+</svg>
