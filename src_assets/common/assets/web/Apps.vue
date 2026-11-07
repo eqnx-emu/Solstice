@@ -8,6 +8,10 @@
       </div>
       <div class="sx-page-actions">
         <RouterLink class="btn btn-sx" to="/featured">{{ $t('navbar.featured') }}</RouterLink>
+        <button class="btn btn-sx" type="button" @click="importSteam" :disabled="steamImport.running"
+                :title="$t('apps.steam_import_desc')">
+          {{ steamImport.running ? $t('apps.steam_importing') : $t('apps.steam_import') }}
+        </button>
         <button class="btn btn-primary" @click="newApp">{{ $t('apps.add_new') }}</button>
       </div>
     </header>
@@ -39,6 +43,7 @@
       </button>
       <span v-if="coverFetch.summary" class="sx-hint" role="status">{{ coverFetch.summary }}</span>
     </div>
+    <p v-if="steamImport.summary" class="sx-hint" role="status">{{ steamImport.summary }}</p>
 
     <!-- Apps list -->
     <section v-if="displayedApps.length > 0" :aria-label="$t('apps.applications_title')">
@@ -748,6 +753,7 @@
         coverCandidates: [],
         coverSearchQuery: "",
         coverFetch: { running: false, done: 0, total: 0, summary: "" },
+        steamImport: { running: false, summary: "" },
         platform: "",
         fileBrowserType: "any",
         fileBrowserTitle: "",
@@ -1023,6 +1029,29 @@
           running: false, done: 0, total: 0,
           summary: this.$t('apps.fetch_covers_result', { found, total: targets.length }),
         };
+      },
+      /**
+       * Ask the host to import its installed Steam games, then reload the list.
+       */
+      async importSteam() {
+        this.steamImport = { running: true, summary: "" };
+        let summary;
+        try {
+          const r = await apiFetch("./api/apps/steam-import", {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+          });
+          const result = await r.json();
+          if (!r.ok) throw new Error(result.error || r.statusText);
+          summary = result.steam_found
+            ? this.$t('apps.steam_import_result', result)
+            : this.$t('apps.steam_import_not_found');
+          await this.loadApps();
+        } catch (e) {
+          console.warn("Steam import failed", e);
+          summary = this.$t('apps.steam_import_failed');
+        }
+        this.steamImport = { running: false, summary };
       },
       showCoverFinder() {
         // Reset search state
