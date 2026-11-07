@@ -4,7 +4,7 @@
       <div class="container-fluid px-lg-4">
         <RouterLink class="navbar-brand" to="/">
           <img src="/images/logo-sunshine-45.png" height="28" width="28" alt="">
-          Sunshine
+          Solstice
         </RouterLink>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
                 aria-controls="navbarSupportedContent" aria-expanded="false" :aria-label="$t('navbar.toggle_navigation')">
