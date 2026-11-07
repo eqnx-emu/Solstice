@@ -40,6 +40,7 @@
 #include "process.h"
 #include "rtsp.h"
 #include "speedtest.h"
+#include "steam_library.h"
 #include "string_hash.h"
 #include "system_tray.h"
 #include "utility.h"
@@ -1425,6 +1426,41 @@ namespace nvhttp {
   }
 
   /**
+   * @brief Import the host's installed Steam games into its applications.
+   * @details Only reachable by paired clients. Reports whether Steam was found and how many games were added and
+   * removed; the client fetches /applist afterwards. A host without this endpoint answers 404, so clients can tell
+   * an unsupported host from one without Steam.
+   *
+   * @param response HTTP response object to populate.
+   * @param request HTTP request data from the client.
+   */
+  void solstice_steam_import(resp_https_t response, req_https_t request) {
+    print_req<SunshineHTTPS>(request);
+
+    pt::ptree tree;
+    auto g = util::fail_guard([&tree, &response]() {
+      std::ostringstream data;
+
+      pt::write_xml(data, tree);
+      response->write(data.str());
+      response->close_connection_after_response = true;
+    });
+
+    try {
+      const auto result = steam_library::import_games(config::stream.file_apps);
+      tree.put("root.<xmlattr>.status_code", 200);
+      tree.put("root.steam", result.steam_found ? 1 : 0);
+      tree.put("root.added", result.added);
+      tree.put("root.removed", result.removed);
+      tree.put("root.installed", result.installed);
+    } catch (std::exception &e) {
+      BOOST_LOG(warning) << "Steam import: "sv << e.what();
+      tree.put("root.<xmlattr>.status_code", 500);
+      tree.put("root.<xmlattr>.status_message", e.what());
+    }
+  }
+
+  /**
    * @brief State of one in-flight speed test download.
    * @details All members are guarded by `mutex`. The slot is released exactly once by speedtest_finish_locked(),
    * whichever of normal completion, write error, deadline timer, exception or server stop happens first.
@@ -1901,7 +1937,7 @@ namespace nvhttp {
 
     std::ifstream in(app_image, std::ios::binary);
     SimpleWeb::CaseInsensitiveMultimap headers;
-    headers.emplace("Content-Type", "image/png");
+    headers.emplace("Content-Type", proc::image_content_type(app_image));
     response->write(SimpleWeb::StatusCode::success_ok, in, headers);
     response->close_connection_after_response = true;
   }
@@ -2022,6 +2058,7 @@ namespace nvhttp {
     };
     https_server.resource["^/cancel$"]["GET"] = cancel;
     https_server.resource["^/solstice/ping$"]["GET"] = solstice_ping;
+    https_server.resource["^/solstice/steam-import$"]["GET"] = solstice_steam_import;
     https_server.resource["^/solstice/speedtest$"]["GET"] = [&https_server](auto resp, auto req) {
       solstice_speedtest(resp, req, *https_server.io_service, https_server.connection_closer(req));
     };

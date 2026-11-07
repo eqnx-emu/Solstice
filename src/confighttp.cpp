@@ -59,6 +59,7 @@
 #include "platform/permissions.h"
 #include "process.h"
 #include "rtsp.h"
+#include "steam_library.h"
 #include "system_tray.h"
 #include "utility.h"
 #include "uuid.h"
@@ -1243,6 +1244,40 @@ namespace confighttp {
   }
 
   /**
+   * @brief Import the installed Steam games into the applications.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   *
+   * @api_examples{/api/apps/steam-import|:| POST|:| null}
+   */
+  void importSteamGames(const resp_https_t &response, const req_https_t &request) {
+    if (!authenticate(response, request)) {
+      return;
+    }
+
+    std::string client_id = get_client_id(request);
+    if (!validate_csrf_token(response, request, client_id)) {
+      return;
+    }
+
+    print_req(request);
+
+    try {
+      const auto result = steam_library::import_games(config::stream.file_apps);
+      nlohmann::json output_tree;
+      output_tree["status"] = result.steam_found;
+      output_tree["steam_found"] = result.steam_found;
+      output_tree["added"] = result.added;
+      output_tree["removed"] = result.removed;
+      output_tree["installed"] = result.installed;
+      send_response(response, output_tree);
+    } catch (std::exception &e) {
+      BOOST_LOG(warning) << "ImportSteamGames: "sv << e.what();
+      bad_request(response, e.what());
+    }
+  }
+
+  /**
    * @brief Close the currently running application.
    * @param response The HTTP response object.
    * @param request The HTTP request object.
@@ -1299,6 +1334,9 @@ namespace confighttp {
       std::string file = file_handler::read_file(config::stream.file_apps.c_str());
       nlohmann::json file_tree = nlohmann::json::parse(file);
       auto &apps = file_tree["apps"];
+
+      // A deleted Steam game stays deleted: the next import skips it.
+      steam_library::forget_game(file_tree, apps[index]);
 
       for (size_t i = 0; i < apps.size(); ++i) {
         if (i != index) {
@@ -1628,7 +1666,7 @@ namespace confighttp {
       }
 
       SimpleWeb::CaseInsensitiveMultimap headers;
-      headers.emplace("Content-Type", "image/png");
+      headers.emplace("Content-Type", proc::image_content_type(validated_path));
       headers.emplace("X-Frame-Options", "DENY");
       headers.emplace("Content-Security-Policy", "frame-ancestors 'none';");
 
@@ -2496,6 +2534,7 @@ namespace confighttp {
     server.resource["^/api/apps$"]["POST"] = saveApp;
     server.resource["^/api/apps/([0-9]+)$"]["DELETE"] = deleteApp;
     server.resource["^/api/apps/close$"]["POST"] = closeApp;
+    server.resource["^/api/apps/steam-import$"]["POST"] = importSteamGames;
     server.resource["^/api/clients/list$"]["GET"] = getClients;
     server.resource["^/api/clients/unpair$"]["POST"] = unpair;
     server.resource["^/api/clients/unpair-all$"]["POST"] = unpairAll;

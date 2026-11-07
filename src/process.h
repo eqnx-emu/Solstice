@@ -228,11 +228,19 @@ namespace proc {
   std::string prepare_command(const std::string &command);
 
   bool check_valid_png(const std::filesystem::path &path);
+  bool check_valid_jpeg(const std::filesystem::path &path);
+  /**
+   * @brief Content type of a validated app image, from its extension.
+   *
+   * @param image_path Path returned by validate_app_image_path().
+   * @return "image/jpeg" for .jpg/.jpeg, "image/png" otherwise.
+   */
+  std::string image_content_type(const std::string &image_path);
   /**
    * @brief Validate app image path.
    *
    * @param app_image_path Candidate image path from the application configuration.
-   * @return Existing PNG path, or the default application image when validation fails.
+   * @return Existing PNG or JPEG path, or the default application image when validation fails.
    */
   std::string validate_app_image_path(std::string app_image_path);
   /**
