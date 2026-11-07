@@ -1427,8 +1427,9 @@ namespace nvhttp {
 
   /**
    * @brief Import the host's installed Steam games into its applications.
-   * @details Only reachable by paired clients. Reports how many games were added and removed; the client
-   * fetches /applist afterwards. Status 404 when Steam is not installed on the host.
+   * @details Only reachable by paired clients. Reports whether Steam was found and how many games were added and
+   * removed; the client fetches /applist afterwards. A host without this endpoint answers 404, so clients can tell
+   * an unsupported host from one without Steam.
    *
    * @param response HTTP response object to populate.
    * @param request HTTP request data from the client.
@@ -1447,12 +1448,8 @@ namespace nvhttp {
 
     try {
       const auto result = steam_library::import_games(config::stream.file_apps);
-      if (!result.steam_found) {
-        tree.put("root.<xmlattr>.status_code", 404);
-        tree.put("root.<xmlattr>.status_message", "Steam is not installed on this PC");
-        return;
-      }
       tree.put("root.<xmlattr>.status_code", 200);
+      tree.put("root.steam", result.steam_found ? 1 : 0);
       tree.put("root.added", result.added);
       tree.put("root.removed", result.removed);
       tree.put("root.installed", result.installed);
