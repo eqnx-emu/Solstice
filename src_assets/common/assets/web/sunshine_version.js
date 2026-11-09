@@ -76,7 +76,7 @@ class SunshineVersion {
 /**
  * @brief GitHub API endpoint listing the releases this build checks for updates.
  */
-export const RELEASES_API_URL = 'https://api.github.com/repos/luizfbalves/Solstice/releases';
+export const RELEASES_API_URL = 'https://api.github.com/repos/eqnx-emu/Solstice/releases';
 
 /**
  * @brief Build a version from GitHub release data, ignoring missing or malformed releases.
