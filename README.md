@@ -7,8 +7,8 @@
 </div>
 
 <div align="center">
-  <a href="https://github.com/luizfbalves/Solstice/releases/latest"><img src="https://img.shields.io/github/v/release/luizfbalves/Solstice.svg?style=for-the-badge&logo=github&label=release" alt="Latest release"></a>
-  <a href="https://github.com/luizfbalves/Solstice/actions/workflows/fork-windows.yml"><img src="https://img.shields.io/github/actions/workflow/status/luizfbalves/Solstice/fork-windows.yml.svg?branch=master&label=windows%20build&logo=github&style=for-the-badge" alt="Windows build"></a>
+  <a href="https://github.com/eqnx-emu/Solstice/releases/latest"><img src="https://img.shields.io/github/v/release/eqnx-emu/Solstice.svg?style=for-the-badge&logo=github&label=release" alt="Latest release"></a>
+  <a href="https://github.com/eqnx-emu/Solstice/actions/workflows/fork-windows.yml"><img src="https://img.shields.io/github/actions/workflow/status/eqnx-emu/Solstice/fork-windows.yml.svg?branch=master&label=windows%20build&logo=github&style=for-the-badge" alt="Windows build"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue.svg?style=for-the-badge" alt="License GPL-3.0"></a>
 </div>
 
@@ -16,7 +16,7 @@
 
 Solstice is a personal fork of [Sunshine](https://github.com/LizardByte/Sunshine), the self-hosted game stream host
 for Moonlight. It keeps everything Sunshine does and adds features aimed at one setup: a Windows PC with an NVIDIA GPU
-streaming to [Equinox](https://github.com/luizfbalves/Equinox), its companion client for the Nintendo Switch.
+streaming to [Equinox](https://github.com/eqnx-emu/Equinox), its companion client for the Nintendo Switch.
 Both apps share the same half sun, half moon logo.
 
 It follows upstream Sunshine and is not affiliated with or endorsed by LizardByte. For everything that is not listed
@@ -64,12 +64,12 @@ below, the [Sunshine documentation](https://docs.lizardbyte.dev/projects/sunshin
 1. Install [usbip-win2](https://github.com/vadimgrn/usbip-win2/releases) (needed only for Switch controller emulation)
    and reboot if asked.
 2. Download `Sunshine-<version>-Windows-AMD64-installer.msi` from the
-   [latest release](https://github.com/luizfbalves/Solstice/releases/latest) and install it.
+   [latest release](https://github.com/eqnx-emu/Solstice/releases/latest) and install it.
    `libVIIPER.dll` is bundled.
 3. In the web UI, go to **Configuration → Input** and set:
    * **Gamepad driver**: `viiper`
    * **Emulated gamepad type**: `auto`
-4. On the Switch, use [Equinox](https://github.com/luizfbalves/Equinox) (or Moonlight-Switch 1.5.3 or newer) and pick
+4. On the Switch, use [Equinox](https://github.com/eqnx-emu/Equinox) (or Moonlight-Switch 1.5.3 or newer) and pick
    the **Switch** key mapping layout.
 
 > [!TIP]
@@ -107,7 +107,7 @@ Solstice exists thanks to the work of others:
   controller visible to Windows.
 * **[ViGEmBus](https://github.com/nefarius/ViGEmBus)** by Nefarius: the Xbox and DualShock 4 fallback.
 * **[Moonlight](https://moonlight-stream.org)** and **[Moonlight-Switch](https://github.com/XITRIX/Moonlight-Switch)**
-  by XITRIX: the clients on the other end, and the base of [Equinox](https://github.com/luizfbalves/Equinox).
+  by XITRIX: the clients on the other end, and the base of [Equinox](https://github.com/eqnx-emu/Equinox).
 * **[Onest](https://github.com/googlefonts/onest)**: the typeface of the Solstice wordmark, under the
   [SIL Open Font License](art/logo/onest_OFL.txt).
 
