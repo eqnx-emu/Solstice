@@ -167,7 +167,7 @@
     sanitize: false
   });
 
-  console.log("Hello, Sunshine!")
+  console.log("Hello, Solstice!")
   export default {
     components: {
       Navbar,
@@ -228,7 +228,7 @@
           this.preReleaseVersion = preReleaseFromList(await fetch(RELEASES_API_URL).then((r) => r.json()));
           console.log("Pre-Release Version: ", this.preReleaseVersion?.version)
         } catch (e) {
-          console.error("Failed to check for Sunshine updates:", e);
+          console.error("Failed to check for Solstice updates:", e);
         }
 
         // Read the broker version on both platforms to identify development builds.

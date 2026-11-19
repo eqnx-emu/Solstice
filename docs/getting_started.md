@@ -1,6 +1,6 @@
 # Getting Started
 
-The recommended method for running Sunshine is to use the [binaries](#binaries) included in the
+The recommended method for running Solstice is to use the [binaries](#binaries) included in the
 [latest release][latest-release], unless otherwise specified.
 
 [Pre-releases](https://github.com/LizardByte/Sunshine/releases) are also available. These should be considered beta,
@@ -8,7 +8,7 @@ and release artifacts may be missing when merging changes on a faster cadence.
 
 ## Binaries
 
-Binaries of Sunshine are created for each release. They are available for FreeBSD, Linux, macOS, and Windows.
+Binaries of Solstice are created for each release. They are available for FreeBSD, Linux, macOS, and Windows.
 Binaries can be found in the [latest release][latest-release].
 
 > [!NOTE]
@@ -60,9 +60,9 @@ available for manual download from each GitHub release.
 CUDA is used for NVFBC capture and direct GPU-memory NVENC encoding.
 
 > [!IMPORTANT]
-> CUDA support is selected when Sunshine is compiled. If you build Sunshine for an NVIDIA GPU yourself, including
-> through the AUR or for a third-party repository such as Omarchy, install the CUDA Toolkit before building Sunshine.
-> Installing CUDA after Sunshine has been compiled does not add CUDA support; Sunshine must be rebuilt.
+> CUDA support is selected when Solstice is compiled. If you build Solstice for an NVIDIA GPU yourself, including
+> through the AUR or for a third-party repository such as Omarchy, install the CUDA Toolkit before building Solstice.
+> Installing CUDA after Solstice has been compiled does not add CUDA support; Solstice must be rebuilt.
 >
 > This requirement does not apply when installing a prebuilt package supplied by LizardByte. In particular, the
 > Arch Linux package from LizardByte's [pacman-repo](https://github.com/LizardByte/pacman-repo) is already built with
@@ -206,7 +206,7 @@ automatically selects the appropriate Debian or Ubuntu release.
     ```}
 }
 
-Install Sunshine after configuring the repository.
+Install Solstice after configuring the repository.
 
 ```bash
 sudo apt update
@@ -221,7 +221,7 @@ sudo apt install ./sunshine_{version}-1+{distro}{distro-version}_{arch}.deb
 ```
 
 > [!NOTE]
-> The `{version}` is the Sunshine version. The `1+{distro}{distro-version}` suffix is the Debian package revision and
+> The `{version}` is the Solstice version. The `1+{distro}{distro-version}` suffix is the Debian package revision and
 > identifies the distro used to build it. The `{arch}` is the architecture of your operating system.
 
 > [!TIP]
@@ -251,7 +251,7 @@ automatically selects Fedora or openSUSE and the appropriate release.
     ```}
 }
 
-Install Sunshine with your distribution's package manager.
+Install Solstice with your distribution's package manager.
 
 @tabs_grouped{distribution|:|
   @tab{ Fedora |:| ```bash
@@ -276,7 +276,7 @@ Download `Sunshine-{version}-1.{distro+version}.{arch}.rpm` and run the followin
 }
 
 > [!NOTE]
-> The `{version}` is the Sunshine version. The `1` is the RPM package release. The `{distro+version}` is the distro and
+> The `{version}` is the Solstice version. The `1` is the RPM package release. The `{distro+version}` is the distro and
 > distro version of the distro we built the package on. The `{arch}` is the architecture of your operating system.
 
 > [!TIP]
@@ -296,7 +296,7 @@ Download `Sunshine-{version}-1.{distro+version}.{arch}.rpm` and run the followin
 ##### Install (Copr)
 
 > [!IMPORTANT]
-> Stable builds are only available if the Sunshine release was made after the Fedora version release.
+> Stable builds are only available if the Solstice release was made after the Fedora version release.
 > Because of this, it is often recommended to use the beta copr; however, you do not need to regularly update.
 > This could lead to annoyances in rare cases where there may be a breaking change.
 
@@ -358,14 +358,14 @@ flatpak install --user ./sunshine_{arch}.flatpak
 
 ##### Additional installation (required)
 Run this command after installing or updating the Flatpak so the privileged host
-udev rules stay synchronized with Sunshine:
+udev rules stay synchronized with Solstice:
 
 ```bash
 flatpak run --command=additional-install.sh dev.lizardbyte.app.Sunshine
 ```
 
 The script prompts for administrator authorization. If a step fails, resolve the
-reported error and rerun the command before starting Sunshine.
+reported error and rerun the command before starting Solstice.
 
 ##### Run with NVFBC capture (X11 Only) or XDG Portal (Wayland Only)
 ```bash
@@ -412,11 +412,11 @@ To use gamepads, download the macOS universal libvirtualhid DMG from the link ab
 **Install libvirtualhid.command** to install Virtual HID Broker. In **System Settings > Privacy & Security >
 Device Control and Data Access**, add `/Applications/VirtualHIDBroker.app` and enable it. Restart the broker if
 you changed this permission with `sudo launchctl kickstart -k system/dev.lizardbyte.app.libvirtualhid`.
-Activate the machine license in Sunshine’s
+Activate the machine license in Solstice’s
 **Troubleshooting > Virtual HID Broker License** section. In **Configuration > Input**, turn on **Enable Gamepad Input**
 and choose the emulated gamepad. The Gamepad Backend setting can be set to **None** to disable gamepads without affecting
-keyboard or mouse input. Sunshine’s menu bar **Virtual HID Broker** submenu shows the license status and links
-for license management and downloads. Sunshine’s DMG does not contain the broker. Keyboard and mouse input use the
+keyboard or mouse input. Solstice’s menu bar **Virtual HID Broker** submenu shows the license status and links
+for license management and downloads. Solstice’s DMG does not contain the broker. Keyboard and mouse input use the
 standard macOS synthetic-input permission path.
 
 #### DMG
@@ -437,7 +437,7 @@ Prebuilt DMG packages require macOS 15.0 (Sequoia) or newer.
 4. Eject the disk image.
 
 ##### Uninstall
-1. Quit Sunshine if it is running.
+1. Quit Solstice if it is running.
 2. Open `Finder`, navigate to `Applications`, and drag `Sunshine.app` to the Trash.
 
 #### Homebrew
@@ -462,7 +462,7 @@ brew uninstall sunshine
 ### Windows
 
 > [!NOTE]
-> Sunshine supports ARM64 on Windows; however, this should be considered experimental. This version does not properly
+> Solstice supports ARM64 on Windows; however, this should be considered experimental. This version does not properly
 > support GPU scheduling and any hardware acceleration.
 
 #### Installer (recommended)
@@ -486,7 +486,7 @@ brew uninstall sunshine
 > You should carefully select or unselect the options you want to install. Do not blindly install or
 > enable features.
 
-To uninstall, find Sunshine in the list <a href="ms-settings:installed-apps">here</a> and select "Uninstall" from the
+To uninstall, find Solstice in the list <a href="ms-settings:installed-apps">here</a> and select "Uninstall" from the
 overflow menu. Different versions of Windows may provide slightly different steps for uninstall.
 
 #### Standalone (lite version)
@@ -570,28 +570,28 @@ systemctl --user --now enable app-dev.lizardbyte.app.Sunshine
 > XDG Desktop Portal, but it is also aliased to "sunshine.service" for convenience.
 
 ### macOS
-On first launch, Sunshine requests Screen Recording and keyboard and mouse control when those features are enabled.
+On first launch, Solstice requests Screen Recording and keyboard and mouse control when those features are enabled.
 It also requests Microphone access if you configured a custom **Audio Sink**, and optional Notifications access when
 the system tray is enabled. Open **Troubleshooting > Permissions** in the Web UI to review these permissions or
-open their System Settings pages. Sunshine restarts once after missing required permissions are granted, including
+open their System Settings pages. Solstice restarts once after missing required permissions are granted, including
 when a permission was removed and later restored.
 If macOS offers **Quit & Reopen** after you allow Screen Recording, choose it so the running process receives the new
-access. Sunshine exits its tray and server threads before macOS reopens it.
+access. Solstice exits its tray and server threads before macOS reopens it.
 
-On macOS 15 and newer, macOS requests Local Network access when Sunshine advertises itself with Bonjour. System Audio
+On macOS 15 and newer, macOS requests Local Network access when Solstice advertises itself with Bonjour. System Audio
 Recording access is requested once at startup with a brief audio tap, when the first stream captures audio if startup
 access was unavailable, or when you use its Web UI button. The button also opens Screen & System Audio Recording
-settings. macOS does not offer Sunshine a passive status check for Local Network
+settings. macOS does not offer Solstice a passive status check for Local Network
 or System Audio Recording, so the Web UI identifies them as permissions handled when used. The Local Network button
 opens **Privacy & Security**; choose **Local Network** there to manage app access.
-Sunshine uses libvirtualhid to send keyboard and mouse events through CoreGraphics. Virtual gamepads use the separately
-installed Virtual HID Broker described in the macOS gamepad setup above. Sunshine shows the broker's availability and
+Solstice uses libvirtualhid to send keyboard and mouse events through CoreGraphics. Virtual gamepads use the separately
+installed Virtual HID Broker described in the macOS gamepad setup above. Solstice shows the broker's availability and
 license under **Troubleshooting > Virtual Input**.
-If a macOS privacy switch is enabled but Sunshine still reports access denied, remove that Sunshine entry and add the
+If a macOS privacy switch is enabled but Solstice still reports access denied, remove that Solstice entry and add the
 installed app again. Development builds should use a consistent Apple-issued signing identity so macOS can recognize
 the app across updates.
 
-Sunshine supports native system audio capture on macOS 14.0 (Sonoma) and newer via Apple’s Audio Tap API.
+Solstice supports native system audio capture on macOS 14.0 (Sonoma) and newer via Apple’s Audio Tap API.
 To use it, simply leave the **Audio Sink** setting blank.
 
 If you prefer to manage your own loopback device, you can still use
@@ -606,12 +606,12 @@ and enter its device name in the [audio_sink](configuration.md#audio_sink) field
 > Gamepads are not currently supported.
 
 ### Windows
-Sunshine supports two virtual gamepad backends on Windows. You can install the
+Solstice supports two virtual gamepad backends on Windows. You can install the
 [Virtual HID Broker](https://github.com/LizardByte/libvirtualhid/releases/latest) separately as an optional paid upgrade.
 Its Windows package includes a broker service and user-mode driver for a Raw Input keyboard and mouse plus full virtual
 gamepad support. ViGEmBus remains available as a limited alternative for Xbox 360 and DualShock 4 gamepads, but it has reached end of life.
 
-When Virtual HID Broker is used, Sunshine requires libvirtualhid version `2026.914.1218.10` or newer.
+When Virtual HID Broker is used, Solstice requires libvirtualhid version `2026.914.1218.10` or newer.
 
 Compared with the ViGEmBus fallback, Virtual HID Broker can create Xbox One, Xbox Series, DualSense, Nintendo Switch
 Pro, and Generic gamepads in addition to Xbox 360 and DualShock 4. It can also expose controller-specific features such
@@ -628,28 +628,28 @@ mouse so applications using Raw Input can receive them. Absolute mouse positioni
 injection. When the driver-backed mouse cannot be created, libvirtualhid retains its legacy SendInput fallback.
 
 The Virtual HID Broker requires an active paid machine license for driver-backed devices, including gamepads and the Raw
-Input keyboard and mouse. Sunshine shows the current license status and actions on the Web UI Troubleshooting page and
-in the **Virtual HID Broker** system tray submenu. In **Configuration > Input**, choose whether Sunshine may use **All
-Available Drivers**, only **Virtual HID Broker**, or only **ViGEmBus**. Sunshine continues to show the selection prompt
-until this setting is saved. If an active Virtual HID Broker license is already present, Sunshine selects **All Available
-Drivers** automatically. That policy prefers Virtual HID Broker. When its license is not valid, Sunshine falls back to
+Input keyboard and mouse. Solstice shows the current license status and actions on the Web UI Troubleshooting page and
+in the **Virtual HID Broker** system tray submenu. In **Configuration > Input**, choose whether Solstice may use **All
+Available Drivers**, only **Virtual HID Broker**, or only **ViGEmBus**. Solstice continues to show the selection prompt
+until this setting is saved. If an active Virtual HID Broker license is already present, Solstice selects **All Available
+Drivers** automatically. That policy prefers Virtual HID Broker. When its license is not valid, Solstice falls back to
 ViGEmBus for Xbox 360 and DualShock 4 gamepads and to SendInput for keyboard and mouse. Selecting only **ViGEmBus**
 suppresses Virtual HID Broker startup notifications and limits the available emulated gamepads to Xbox 360 and
 DualShock 4. **None** disables all virtual gamepads and their startup notices without affecting keyboard or mouse
-input. Sunshine recreates the shared keyboard and mouse after a successful license action, so switching between
-the HID and SendInput paths does not require restarting Sunshine.
+input. Solstice recreates the shared keyboard and mouse after a successful license action, so switching between
+the HID and SendInput paths does not require restarting Solstice.
 
 After installing or updating virtual input drivers, it is recommended to restart your computer.
 
 ## Usage
 
 ### Basic usage
-If Sunshine is not installed/running as a service, then start Sunshine with the following command, unless a start
+If Solstice is not installed/running as a service, then start Solstice with the following command, unless a start
 command is listed in the specified package [install](#install) instructions above.
 
 > [!NOTE]
-> A service is a process that runs in the background. This is the default when installing Sunshine from the
-> Windows installer. Running multiple instances of Sunshine is not advised.
+> A service is a process that runs in the background. This is the default when installing Solstice from the
+> Windows installer. Running multiple instances of Solstice is not advised.
 
 ```bash
 sunshine
@@ -665,7 +665,7 @@ sunshine <directory of conf file>/sunshine.conf
 > If no config file is entered, the default location will be used.
 > The configuration file specified will be created if it doesn't exist.
 
-### Start Sunshine over SSH (Linux/X11)
+### Start Solstice over SSH (Linux/X11)
 Assuming you are already logged into the host, you can use this command
 
 ```bash
@@ -673,7 +673,7 @@ ssh <user>@<ip_address> 'export DISPLAY=:0; sunshine'
 ```
 
 If you are logged into the host with only a tty (teletypewriter), you can use `startx` to start the X server prior to
-executing Sunshine. You nay need to add `sleep` between `startx` and `sunshine` to allow more time for the display to
+executing Solstice. You nay need to add `sleep` between `startx` and `sunshine` to allow more time for the display to
 be ready.
 
 ```bash
@@ -688,7 +688,7 @@ on how to set up a headless streaming server without autologin and dummy plugs (
 
 ### Configuration
 
-Sunshine is configured via the web ui, which is available on [https://localhost:47990](https://localhost:47990)
+Solstice is configured via the web ui, which is available on [https://localhost:47990](https://localhost:47990)
 by default. You may replace *localhost* with your internal ip address.
 
 > [!NOTE]
@@ -704,7 +704,7 @@ by default. You may replace *localhost* with your internal ip address.
    ![Applications](images/applications.png)
 3. Adjust any configuration settings as needed. You can search for options in the search bar.
    ![Configuration](images/configuration-search.png)
-4. Find Moonlight clients and other tools for Sunshine in the `Featured Apps` tab.
+4. Find Moonlight clients and other tools for Solstice in the `Featured Apps` tab.
    ![Featured Apps](images/featured-apps.png)
 5. In Moonlight, you may need to add the PC manually.
 6. When Moonlight requests for you insert the pin:
@@ -747,11 +747,11 @@ All shortcuts start with `Ctrl+Alt+Shift`, just like Moonlight.
 * You can use Environment variables in place of values
 * `$(HOME)` will be replaced by the value of `$HOME`
 * `$$` will be replaced by `$`, e.g. `$$(HOME)` will be become `$(HOME)`
-* `env` - Adds or overwrites Environment variables for the commands/applications run by Sunshine.
+* `env` - Adds or overwrites Environment variables for the commands/applications run by Solstice.
   This can only be changed by modifying the `apps.json` file directly.
 
 ### Considerations
-* On Windows, Sunshine uses the Desktop Duplication API which only supports capturing from the GPU used for display.
+* On Windows, Solstice uses the Desktop Duplication API which only supports capturing from the GPU used for display.
   If you want to capture and encode on the eGPU, connect a display or HDMI dummy display dongle to it and run the games
   on that display.
 * When an application is started, if there is an application already running, it will be terminated.
@@ -769,7 +769,7 @@ All shortcuts start with `Ctrl+Alt+Shift`, just like Moonlight.
 
   * On FreeBSD/Linux, add the user running sunshine to the `input` group.
 
-* The FreeBSD version of Sunshine is missing some features that are present on Linux.
+* The FreeBSD version of Solstice is missing some features that are present on Linux.
   The following are known limitations.
 
   * Only X11 and Wayland capture are supported

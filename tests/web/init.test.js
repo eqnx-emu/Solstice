@@ -66,7 +66,7 @@ describe('initApp', () => {
     initApp(app, config)
     await flushPromises()
 
-    expect(console.error).toHaveBeenCalledExactlyOnceWith('Failed to initialize Sunshine', error)
+    expect(console.error).toHaveBeenCalledExactlyOnceWith('Failed to initialize Solstice', error)
     expect(app.use).not.toHaveBeenCalled()
     expect(app.provide).not.toHaveBeenCalled()
     expect(app.mount).not.toHaveBeenCalled()
@@ -84,6 +84,6 @@ describe('initApp', () => {
 
     expect(app.mount).toHaveBeenCalledExactlyOnceWith('#app')
     expect(config).toHaveBeenCalledExactlyOnceWith(app)
-    expect(console.error).toHaveBeenCalledExactlyOnceWith('Failed to initialize Sunshine', error)
+    expect(console.error).toHaveBeenCalledExactlyOnceWith('Failed to initialize Solstice', error)
   })
 })

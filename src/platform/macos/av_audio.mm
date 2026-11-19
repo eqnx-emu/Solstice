@@ -48,7 +48,7 @@ namespace platf {
       if (authorization_status == AVAuthorizationStatusRestricted) {
         BOOST_LOG(error) << "Microphone access is restricted by macOS."sv;
       } else {
-        BOOST_LOG(error) << "Microphone access was denied. Enable Sunshine in System Settings -> Privacy & Security -> Microphone."sv;
+        BOOST_LOG(error) << "Microphone access was denied. Enable Solstice in System Settings -> Privacy & Security -> Microphone."sv;
       }
     }
 

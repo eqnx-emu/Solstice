@@ -26,6 +26,6 @@ export function initApp(app, config) {
             config(app)
         }
     }).catch(error => {
-        console.error('Failed to initialize Sunshine', error);
+        console.error('Failed to initialize Solstice', error);
     });
 }

@@ -238,9 +238,9 @@ namespace pipewire {
 
       if (!variable_rate && rate_comparison < 0) {
         BOOST_LOG(warning)
-          << "[pipewire] Sunshine frame pacing: disabled (negotiated rate lower than requested rate)"sv;
+          << "[pipewire] Solstice frame pacing: disabled (negotiated rate lower than requested rate)"sv;
       } else {
-        BOOST_LOG(info) << "[pipewire] Sunshine frame pacing: "sv
+        BOOST_LOG(info) << "[pipewire] Solstice frame pacing: "sv
                         << (pacing_required ? std::format("enabled ({}ms)", std::chrono::duration<double, std::milli>(requested_delay).count()) : "disabled (event-driven capture)");
       }
 
@@ -331,7 +331,7 @@ namespace pipewire {
         struct pw_properties *props = pw_properties_new(PW_KEY_MEDIA_TYPE, "Video", PW_KEY_MEDIA_CATEGORY, "Capture", PW_KEY_MEDIA_ROLE, "Screen", nullptr);
 
         BOOST_LOG(debug) << "[pipewire] Create PW stream"sv;
-        stream_data.stream = pw_stream_new(core, "Sunshine Video Capture", props);
+        stream_data.stream = pw_stream_new(core, "Solstice Video Capture", props);
         pw_stream_add_listener(stream_data.stream, &stream_data.stream_listener, &stream_events, &stream_data);
 
         std::array<uint8_t, SPA_POD_BUFFER_SIZE> buffer;
@@ -571,7 +571,7 @@ namespace pipewire {
       }
 
       BOOST_LOG(info) << "[pipewire] Using frame_timestamp (pts) metadata source: "sv
-                      << (use_pts ? "Pipewire (via compositor)" : PROJECT_NAME);
+                      << (use_pts ? "Pipewire (via compositor)" : PROJECT_DISPLAY_NAME);
       return use_pts;
     }
 
@@ -1069,7 +1069,7 @@ namespace pipewire {
       if (fps.den != 1) {
         BOOST_LOG(info) << "[pipewire] Requested frame rate: "sv << fps.num << "/"sv << fps.den << ", approx. "sv << av_q2d(fps) << " fps"sv;
       } else if (fps.num == 0 && fps.den == 1) {
-        BOOST_LOG(info) << "[pipewire] Requested variable frame rate (Sunshine pacing required: "sv << std::chrono::duration<double, std::milli>(delay).count() << "ms)"sv;
+        BOOST_LOG(info) << "[pipewire] Requested variable frame rate (Solstice pacing required: "sv << std::chrono::duration<double, std::milli>(delay).count() << "ms)"sv;
       } else {
         BOOST_LOG(info) << "[pipewire] Requested frame rate: "sv << fps.num << "fps"sv;
       }

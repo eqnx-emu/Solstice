@@ -119,7 +119,7 @@ namespace platf {
         }
 
         if ((audio_capture_device = [AVAudio findMicrophone:[NSString stringWithUTF8String:audio_sink]]) == nullptr) {
-          BOOST_LOG(error) << "opening microphone '"sv << audio_sink << "' failed. Please set a valid input source in the Sunshine config."sv;
+          BOOST_LOG(error) << "opening microphone '"sv << audio_sink << "' failed. Please set a valid input source in the Solstice config."sv;
           BOOST_LOG(error) << "Available inputs:"sv;
 
           for (NSString *name in [AVAudio microphoneNames]) {

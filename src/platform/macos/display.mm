@@ -253,7 +253,7 @@ namespace platf {
       BOOST_LOG(debug) << "Display wake attempt did not expose the requested display ["sv << display_name << ']';
     }
 
-    display->display_power_guard = display_device::keep_display_awake("Sunshine display capture");
+    display->display_power_guard = display_device::keep_display_awake("Solstice display capture");
     if (display->display_power_guard) {
       BOOST_LOG(debug) << "Keeping display awake for capture"sv;
     } else {

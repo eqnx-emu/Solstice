@@ -352,7 +352,7 @@ namespace platf {
     if (elevated && (elevationType == TokenElevationTypeDefault && !IsUserAdmin(userToken))) {
       // We don't have to strip the token or do anything here, but let's give the user a warning so they're aware what is happening.
       BOOST_LOG(warning) << "This command requires elevation and the current user account logged in does not have administrator rights. "
-                         << "For security reasons Sunshine will retain the same access level as the current user and will not elevate it.";
+                         << "For security reasons Solstice will retain the same access level as the current user and will not elevate it.";
     }
 
     // User has a limited token, this means they have UAC enabled and is an Administrator
@@ -1273,7 +1273,7 @@ namespace platf {
   void enable_mouse_keys() {
     // If there is no mouse connected, enable Mouse Keys to force the cursor to appear
     if (!GetSystemMetrics(SM_MOUSEPRESENT)) {
-      BOOST_LOG(info) << "A mouse was not detected. Sunshine will enable Mouse Keys while streaming to force the mouse cursor to appear.";
+      BOOST_LOG(info) << "A mouse was not detected. Solstice will enable Mouse Keys while streaming to force the mouse cursor to appear.";
 
       // Get the current state of Mouse Keys so we can restore it when streaming is over
       previous_mouse_keys_state.cbSize = sizeof(previous_mouse_keys_state);
@@ -1339,14 +1339,14 @@ namespace platf {
     std::array<WCHAR, MAX_PATH> executable;
     if (GetModuleFileNameW(nullptr, executable.data(), executable.size()) == 0) {
       auto winerr = GetLastError();
-      BOOST_LOG(fatal) << "Failed to get Sunshine path: "sv << winerr;
+      BOOST_LOG(fatal) << "Failed to get Solstice path: "sv << winerr;
       return;
     }
 
     PROCESS_INFORMATION process_info;
     if (!CreateProcessW(executable.data(), GetCommandLineW(), nullptr, nullptr, false, CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT, nullptr, nullptr, (LPSTARTUPINFOW) &startup_info, &process_info)) {
       auto winerr = GetLastError();
-      BOOST_LOG(fatal) << "Unable to restart Sunshine: "sv << winerr;
+      BOOST_LOG(fatal) << "Unable to restart Solstice: "sv << winerr;
       return;
     }
 
@@ -1813,7 +1813,7 @@ namespace platf {
     std::array<WCHAR, 256> hostname;
     if (GetHostNameW(hostname.data(), hostname.size()) == SOCKET_ERROR) {
       BOOST_LOG(error) << "GetHostNameW() failed: "sv << WSAGetLastError();
-      return "Sunshine"s;
+      return "Solstice"s;
     }
     return utf_utils::to_utf8(hostname.data());
   }

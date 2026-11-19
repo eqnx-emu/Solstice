@@ -514,7 +514,7 @@ namespace display_device {
         case resolution_option_e::automatic:
           {
             if (!session.enable_sops) {
-              BOOST_LOG(warning) << R"(Sunshine is configured to change resolution automatically, but the "Optimize game settings" is not set in the client! Resolution will not be changed.)";
+              BOOST_LOG(warning) << R"(Solstice is configured to change resolution automatically, but the "Optimize game settings" is not set in the client! Resolution will not be changed.)";
             } else if (session.width >= 0 && session.height >= 0) {
               config.m_resolution = Resolution {
                 static_cast<unsigned int>(session.width),

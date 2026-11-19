@@ -5,6 +5,9 @@ cmake_minimum_required(VERSION 3.24)
 # `third-party/libvirtualhid` requires 3.24
 # todo - set this conditionally
 
+# Name shown to users. The CMake project name stays "Sunshine" because it names the executable, service and paths.
+set(PROJECT_DISPLAY_NAME "Solstice")
+
 project(Sunshine VERSION 0.0.0
         DESCRIPTION "Self-hosted game stream host for Moonlight"
         HOMEPAGE_URL "https://app.lizardbyte.dev/Sunshine")

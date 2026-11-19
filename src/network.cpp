@@ -277,6 +277,6 @@ namespace net {
       }
     }
 
-    return !instancename.empty() ? instancename : "Sunshine";
+    return !instancename.empty() ? instancename : "Solstice";
   }
 }  // namespace net

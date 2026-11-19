@@ -204,11 +204,11 @@ function Write-LogFile {
 # If Action is not provided, prompt the user
 if (-not $Action) {
     Write-Information ""
-    Write-FramedText -Message "🔅 Sunshine Setup Script" -Level "Information" -Color "Cyan"
+    Write-FramedText -Message "🔅 Solstice Setup Script" -Level "Information" -Color "Cyan"
     Write-Information ""
     Write-LogMessage -Message "Please select an action:" -Level "Information" -Color "Yellow"
-    Write-LogMessage -Message "  1. Install Sunshine" -Level "Information" -Color "Green"
-    Write-LogMessage -Message "  2. Uninstall Sunshine" -Level "Information" -Color "Red"
+    Write-LogMessage -Message "  1. Install Solstice" -Level "Information" -Color "Green"
+    Write-LogMessage -Message "  2. Uninstall Solstice" -Level "Information" -Color "Red"
     Write-Information ""
 
     $validChoice = $false
@@ -320,7 +320,7 @@ Write-Information ""
 
 if ($Action -eq "install") {
     Write-FramedText `
-        -Message "🔅 Sunshine Installation Script" `
+        -Message "🔅 Solstice Installation Script" `
         -Level "Information" `
         -Color "Yellow"
     Write-Information ""
@@ -331,7 +331,7 @@ if ($Action -eq "install") {
     # Reset permissions on the install directory
     $currentStep++
     Write-Progress `
-        -Activity "Installing Sunshine" `
+        -Activity "Installing Solstice" `
         -Status "Resetting permissions on installation directory" `
         -PercentComplete (($currentStep / $totalSteps) * 100)
     Write-LogMessage -Message "🔐 Resetting permissions on installation directory" -Level "Step"
@@ -398,21 +398,21 @@ if ($Action -eq "install") {
     # 1. Update PATH (add)
     $currentStep++
     Write-Progress `
-        -Activity "Installing Sunshine" `
+        -Activity "Installing Solstice" `
         -Status "Updating system PATH" `
         -PercentComplete (($currentStep / $totalSteps) * 100)
     $updatePathScript = Join-Path $RootDir "scripts\update-path.bat"
     Invoke-ScriptIfExist `
         -ScriptPath $updatePathScript `
         -Arguments "add" `
-        -Description "Adding Sunshine directories to PATH" `
+        -Description "Adding Solstice directories to PATH" `
         -Emoji "📁"
     Write-Information ""
 
     # 2. Migrate configuration
     $currentStep++
     Write-Progress `
-        -Activity "Installing Sunshine" `
+        -Activity "Installing Solstice" `
         -Status "Migrating configuration" `
         -PercentComplete (($currentStep / $totalSteps) * 100)
     $migrateConfigScript = Join-Path $RootDir "scripts\migrate-config.bat"
@@ -425,7 +425,7 @@ if ($Action -eq "install") {
     # 3. Add firewall rules
     $currentStep++
     Write-Progress `
-        -Activity "Installing Sunshine" `
+        -Activity "Installing Solstice" `
         -Status "Configuring firewall" `
         -PercentComplete (($currentStep / $totalSteps) * 100)
     $addFirewallScript = Join-Path $RootDir "scripts\add-firewall-rule.bat"
@@ -439,7 +439,7 @@ if ($Action -eq "install") {
     # This runs before the service is installed and started, so that Sunshine finds the driver when it starts.
     $currentStep++
     Write-Progress `
-        -Activity "Installing Sunshine" `
+        -Activity "Installing Solstice" `
         -Status "Installing virtual display driver" `
         -PercentComplete (($currentStep / $totalSteps) * 100)
     Invoke-SudoVdaScript -ScriptName "install.ps1" -Description "Installing virtual display driver (SudoVDA)"
@@ -448,7 +448,7 @@ if ($Action -eq "install") {
     # 5. Install service
     $currentStep++
     Write-Progress `
-        -Activity "Installing Sunshine" `
+        -Activity "Installing Solstice" `
         -Status "Installing service" `
         -PercentComplete (($currentStep / $totalSteps) * 100)
     $installServiceScript = Join-Path $RootDir "scripts\install-service.bat"
@@ -461,7 +461,7 @@ if ($Action -eq "install") {
     # 6. Configure autostart
     $currentStep++
     Write-Progress `
-        -Activity "Installing Sunshine" `
+        -Activity "Installing Solstice" `
         -Status "Configuring autostart" `
         -PercentComplete (($currentStep / $totalSteps) * 100)
     $autostartScript = Join-Path $RootDir "scripts\autostart-service.bat"
@@ -471,8 +471,8 @@ if ($Action -eq "install") {
         -Emoji "🚀"
     Write-Information ""
 
-    Write-Progress -Activity "Installing Sunshine" -Completed
-    Write-FramedText -Message "✓ Sunshine installation completed successfully!" -Level "Success"
+    Write-Progress -Activity "Installing Solstice" -Completed
+    Write-FramedText -Message "✓ Solstice installation completed successfully!" -Level "Success"
     if ($script:SudoVdaFailed) {
         Write-LogMessage `
             -Message "The virtual display driver (SudoVDA) was not installed. Streaming still works on the physical display. See the log: $LogPath" `
@@ -497,7 +497,7 @@ if ($Action -eq "install") {
 
 } elseif ($Action -eq "uninstall") {
     Write-FramedText `
-        -Message "🗑️  Sunshine Uninstallation Script" `
+        -Message "🗑️  Solstice Uninstallation Script" `
         -Level "Information" `
         -Color "Yellow"
     Write-Information ""
@@ -508,7 +508,7 @@ if ($Action -eq "install") {
     # 1. Delete firewall rules
     $currentStep++
     Write-Progress `
-        -Activity "Uninstalling Sunshine" `
+        -Activity "Uninstalling Solstice" `
         -Status "Removing firewall rules" `
         -PercentComplete (($currentStep / $totalSteps) * 100)
     $deleteFirewallScript = Join-Path $RootDir "scripts\delete-firewall-rule.bat"
@@ -521,7 +521,7 @@ if ($Action -eq "install") {
     # 2. Uninstall service
     $currentStep++
     Write-Progress `
-        -Activity "Uninstalling Sunshine" `
+        -Activity "Uninstalling Solstice" `
         -Status "Uninstalling service" `
         -PercentComplete (($currentStep / $totalSteps) * 100)
     $uninstallServiceScript = Join-Path $RootDir "scripts\uninstall-service.bat"
@@ -535,7 +535,7 @@ if ($Action -eq "install") {
     # This runs after the service is stopped, so that Sunshine no longer holds the driver open.
     $currentStep++
     Write-Progress `
-        -Activity "Uninstalling Sunshine" `
+        -Activity "Uninstalling Solstice" `
         -Status "Removing virtual display driver" `
         -PercentComplete (($currentStep / $totalSteps) * 100)
     Invoke-SudoVdaScript -ScriptName "uninstall.ps1" -Description "Removing virtual display driver (SudoVDA)"
@@ -544,7 +544,7 @@ if ($Action -eq "install") {
     # 4. Restore NVIDIA preferences
     $currentStep++
     Write-Progress `
-        -Activity "Uninstalling Sunshine" `
+        -Activity "Uninstalling Solstice" `
         -Status "Restoring NVIDIA settings" `
         -PercentComplete (($currentStep / $totalSteps) * 100)
     Invoke-SunshineIfExist `
@@ -556,7 +556,7 @@ if ($Action -eq "install") {
     # 5. Update PATH (remove)
     $currentStep++
     Write-Progress `
-        -Activity "Uninstalling Sunshine" `
+        -Activity "Uninstalling Solstice" `
         -Status "Cleaning up system PATH" `
         -PercentComplete (($currentStep / $totalSteps) * 100)
     $updatePathScript = Join-Path $RootDir "scripts\update-path.bat"
@@ -567,9 +567,9 @@ if ($Action -eq "install") {
         -Emoji "📁"
     Write-Information ""
 
-    Write-Progress -Activity "Uninstalling Sunshine" -Completed
+    Write-Progress -Activity "Uninstalling Solstice" -Completed
     Write-FramedText `
-        -Message "✓ Sunshine uninstallation completed successfully!" `
+        -Message "✓ Solstice uninstallation completed successfully!" `
         -Level "Success"
     if ($script:SudoVdaFailed) {
         Write-LogMessage `
