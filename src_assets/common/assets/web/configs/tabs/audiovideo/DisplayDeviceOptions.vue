@@ -87,8 +87,7 @@ function addRemappingEntry() {
                   <option value="auto">{{ $t('config.dd_resolution_option_auto') }}</option>
                   <option value="manual">{{ $t('config.dd_resolution_option_manual') }}</option>
                 </select>
-                <div class="form-text"
-                     v-if="config.dd_resolution_option === 'auto' || config.dd_resolution_option === 'manual'">
+                <div class="form-text" v-if="config.dd_resolution_option === 'auto'">
                   {{ $t('config.dd_resolution_option_ogs_desc') }}
                 </div>
 

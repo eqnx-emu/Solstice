@@ -1256,7 +1256,8 @@ consent prompt for directory ACLs, so the Web UI shows setup steps for correctin
         <td>Description</td>
         <td colspan="2">
             Perform additional resolution configuration for the display device.
-            @note{"Optimize game settings" must be enabled in Moonlight for this option to work.}
+            @note{"Optimize game settings" must be enabled in Moonlight for the `auto` choice to work. The `manual`
+            choice is applied regardless of that client setting.}
             @note{Applies to Windows only.}
         </td>
     </tr>

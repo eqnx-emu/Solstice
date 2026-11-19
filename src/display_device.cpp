@@ -528,18 +528,15 @@ namespace display_device {
           }
         case resolution_option_e::manual:
           {
-            if (!session.enable_sops) {
-              BOOST_LOG(warning) << R"(Sunshine is configured to change resolution manually, but the "Optimize game settings" is not set in the client! Resolution will not be changed.)";
-            } else {
-              if (!parse_resolution_string(video_config.dd.manual_resolution, config.m_resolution)) {
-                BOOST_LOG(error) << "Failed to parse manual resolution string!";
-                return false;
-              }
+            // The manual resolution is chosen on the host, so it does not depend on the client's "Optimize game settings".
+            if (!parse_resolution_string(video_config.dd.manual_resolution, config.m_resolution)) {
+              BOOST_LOG(error) << "Failed to parse manual resolution string!";
+              return false;
+            }
 
-              if (!config.m_resolution) {
-                BOOST_LOG(error) << "Manual resolution must be specified!";
-                return false;
-              }
+            if (!config.m_resolution) {
+              BOOST_LOG(error) << "Manual resolution must be specified!";
+              return false;
             }
             break;
           }
