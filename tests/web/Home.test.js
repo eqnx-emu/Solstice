@@ -32,10 +32,10 @@ async function mountHome(platform, { developmentVersion = true, licensed = true,
     if (url === './api/logs') {
       return { text: async () => '' }
     }
-    if (url === 'https://api.github.com/repos/luizfbalves/Solstice/releases/latest') {
+    if (url === 'https://api.github.com/repos/eqnx-emu/Solstice/releases/latest') {
       return { json: async () => (releasesMissing ? { message: 'Not Found' } : { tag_name: 'v2026.927.1200' }) }
     }
-    if (url === 'https://api.github.com/repos/luizfbalves/Solstice/releases') {
+    if (url === 'https://api.github.com/repos/eqnx-emu/Solstice/releases') {
       return { json: async () => (releasesMissing ? [] : [{ tag_name: 'v2026.927.1200', prerelease: true }]) }
     }
     throw new Error(`Unexpected fetch: ${url}`)
@@ -117,7 +117,7 @@ describe('development broker home notice', () => {
   it('still loads broker status when Solstice has no releases yet', async () => {
     const wrapper = await mountHome('windows', { releasesMissing: true })
 
-    expect(fetch).toHaveBeenCalledWith('https://api.github.com/repos/luizfbalves/Solstice/releases/latest')
+    expect(fetch).toHaveBeenCalledWith('https://api.github.com/repos/eqnx-emu/Solstice/releases/latest')
     expect(fetch).toHaveBeenCalledWith('./api/virtual-input/status')
     expect(wrapper.vm.githubVersion).toBeNull()
     expect(wrapper.vm.preReleaseVersion).toBeNull()

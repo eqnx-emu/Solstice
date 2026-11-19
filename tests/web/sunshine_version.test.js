@@ -56,7 +56,7 @@ describe('SunshineVersion', () => {
   })
 
   it('checks Solstice for releases', () => {
-    expect(RELEASES_API_URL).toBe('https://api.github.com/repos/luizfbalves/Solstice/releases')
+    expect(RELEASES_API_URL).toBe('https://api.github.com/repos/eqnx-emu/Solstice/releases')
   })
 
   it('builds versions only from tagged releases', () => {
