@@ -842,7 +842,8 @@ namespace config {
 
     0,  // max_bitrate
     0,  // minimum_fps_target (0 = framerate)
-    video_t::virtual_display_e::disabled  // virtual_display
+    video_t::virtual_display_e::disabled,  // virtual_display
+    false  // virtual_display_secondary
   };
 
   /**
@@ -1758,6 +1759,7 @@ namespace config {
     string_f(vars, "adapter_name", video.adapter_name);
     string_f(vars, "output_name", video.output_name);
     generic_f(vars, "virtual_display", video.virtual_display, vd::virtual_display_from_view);
+    bool_f(vars, "virtual_display_secondary", video.virtual_display_secondary);
 
     generic_f(vars, "dd_configuration_option", video.dd.configuration_option, dd::config_option_from_view);
     generic_f(vars, "dd_resolution_option", video.dd.resolution_option, dd::resolution_option_from_view);

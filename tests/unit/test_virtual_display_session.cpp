@@ -541,6 +541,34 @@ TEST_F(VirtualDisplay, UpgradesEnsureActiveToEnsurePrimary) {
   EXPECT_EQ(config::video.dd.configuration_option, config_option_e::ensure_active);
 }
 
+TEST_F(VirtualDisplay, SecondaryKeepsPhysicalDisplaysActive) {
+  // ensure_only_display would turn the physical displays off; the secondary option must win over it.
+  config::video.virtual_display_secondary = true;
+  config::video.dd.configuration_option = config_option_e::ensure_only_display;
+  auto session {make_session(1280, 720, 60)};
+
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+
+  const auto applied {settings->applied_configs()};
+  ASSERT_EQ(applied.size(), 1);
+  EXPECT_EQ(applied[0].m_device_id, virtual_device_id);
+  EXPECT_EQ(applied[0].m_device_prep, device_prep_t::EnsureActive);
+  EXPECT_EQ(applied[0].m_resolution, (display_device::Resolution {1280, 720}));
+  EXPECT_EQ(config::video.dd.configuration_option, config_option_e::ensure_only_display);
+}
+
+TEST_F(VirtualDisplay, SecondaryDoesNotUpgradeToEnsurePrimary) {
+  config::video.virtual_display_secondary = true;
+  config::video.dd.configuration_option = config_option_e::disabled;
+  auto session {make_session(1280, 720, 60)};
+
+  ASSERT_TRUE(virtual_display::begin(*session, "", launch));
+
+  const auto applied {settings->applied_configs()};
+  ASSERT_EQ(applied.size(), 1);
+  EXPECT_EQ(applied[0].m_device_prep, device_prep_t::EnsureActive);
+}
+
 TEST_F(VirtualDisplay, KeepsEnsurePrimary) {
   config::video.dd.configuration_option = config_option_e::ensure_primary;
   auto session {make_session(1280, 720, 60)};

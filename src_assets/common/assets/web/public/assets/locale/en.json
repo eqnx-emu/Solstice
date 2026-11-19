@@ -500,6 +500,8 @@
     "virtual_display_always": "Always (every app except those that disable it)",
     "virtual_display_apps": "Only apps that enable it",
     "virtual_display_desc": "Stream from a dedicated virtual display instead of a physical monitor. Requires the Solstice virtual display driver; if it is missing, streaming falls back to the physical display.",
+    "virtual_display_secondary": "Add the virtual display as a secondary display",
+    "virtual_display_secondary_desc": "Extend the desktop to the virtual display instead of making it the primary display. Physical displays stay on and the primary display does not change, whatever the display device configuration says. Apps may open on the primary physical display.",
     "virtual_sink": "Virtual Sink",
     "virtual_sink_desc": "Manually specify a virtual audio device to use. If unset, the device is chosen automatically. We strongly recommend leaving this field blank to use automatic device selection!",
     "virtual_sink_placeholder": "Steam Streaming Speakers",

@@ -247,8 +247,11 @@ namespace virtual_display {
     /**
      * @brief Apply the display configuration for the active virtual display and report whether it worked.
      *
-     * The virtual display must become primary, so `disabled`, `verify_only` and `ensure_active` are upgraded to
-     * `ensure_primary`. Resolution and refresh rate always follow the client's request, and HDR is requested off.
+     * By default the virtual display must become primary, so `disabled`, `verify_only` and `ensure_active` are
+     * upgraded to `ensure_primary`. With `config::video.virtual_display_secondary`, `ensure_active` is used instead,
+     * whatever the configured option: the desktop is extended to the virtual display, and the physical displays and
+     * the primary display are left as they are. Resolution and refresh rate always follow the client's request, and
+     * HDR is requested off.
      *
      * @param session The launch session. `enable_sops` is set only for the duration of the call, `enable_hdr` is
      *                cleared when the configuration was applied and left unchanged otherwise.
@@ -259,15 +262,20 @@ namespace virtual_display {
       using config_option_e = config::video_t::dd_t::config_option_e;
 
       auto video_config {config::video};
-      switch (video_config.dd.configuration_option) {
-        case config_option_e::disabled:
-        case config_option_e::verify_only:
-        case config_option_e::ensure_active:
-          video_config.dd.configuration_option = config_option_e::ensure_primary;
-          break;
-        case config_option_e::ensure_primary:
-        case config_option_e::ensure_only_display:
-          break;
+      if (video_config.virtual_display_secondary) {
+        // Extend the desktop: every physical display stays active and the current primary display stays primary.
+        video_config.dd.configuration_option = config_option_e::ensure_active;
+      } else {
+        switch (video_config.dd.configuration_option) {
+          case config_option_e::disabled:
+          case config_option_e::verify_only:
+          case config_option_e::ensure_active:
+            video_config.dd.configuration_option = config_option_e::ensure_primary;
+            break;
+          case config_option_e::ensure_primary:
+          case config_option_e::ensure_only_display:
+            break;
+        }
       }
       video_config.dd.resolution_option = config::video_t::dd_t::resolution_option_e::automatic;
       video_config.dd.refresh_rate_option = config::video_t::dd_t::refresh_rate_option_e::automatic;

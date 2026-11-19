@@ -243,6 +243,7 @@ namespace config {
     };
 
     virtual_display_e virtual_display;  ///< Virtual display policy selected by configuration.
+    bool virtual_display_secondary;  ///< Extend the desktop to the virtual display instead of making it primary.
   };
 
   /**

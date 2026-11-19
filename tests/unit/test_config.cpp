@@ -280,6 +280,21 @@ TEST_F(ConfigPersistenceTest, ParsesVirtualDisplayOption) {
 }
 
 /**
+ * @brief Verify the secondary virtual display option is parsed as a boolean.
+ */
+TEST_F(ConfigPersistenceTest, ParsesVirtualDisplaySecondaryOption) {
+  const auto apps_file = config_file().parent_path() / "sunshine_test_config_apps.json";
+  ASSERT_EQ(file_handler::write_file(apps_file.string().c_str(), "{}"), 0);
+  config::stream.file_apps = apps_file.string();
+
+  config::apply_config_for_test("virtual_display_secondary = enabled\n");
+  EXPECT_TRUE(config::video.virtual_display_secondary);
+
+  config::apply_config_for_test("virtual_display_secondary = disabled\n");
+  EXPECT_FALSE(config::video.virtual_display_secondary);
+}
+
+/**
  * @brief Verify mixed-case boolean values update configuration correctly.
  */
 TEST_F(ConfigPersistenceTest, ParsesBooleanOptionsCaseInsensitively) {

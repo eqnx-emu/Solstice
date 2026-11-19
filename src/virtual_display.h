@@ -73,7 +73,9 @@ namespace virtual_display {
    *
    * Creates a virtual display with the client's requested mode, points `config::video.output_name` at it,
    * forces HDR off and configures it as the primary display (`disabled`, `verify_only` and `ensure_active` are
-   * upgraded to `ensure_primary`; `ensure_primary` and `ensure_only_display` are kept). When a virtual display is
+   * upgraded to `ensure_primary`; `ensure_primary` and `ensure_only_display` are kept). With
+   * `config::video.virtual_display_secondary`, it is activated as a secondary display instead (`ensure_active`),
+   * leaving the physical displays and the primary display unchanged. When a virtual display is
    * already active (resume), no new display is created and only the new mode is applied.
    *
    * The configuration is applied in the calling thread and retried for a few seconds while a new monitor

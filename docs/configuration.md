@@ -1157,8 +1157,9 @@ consent prompt for directory ACLs, so the Web UI shows setup steps for correctin
             Stream from a dedicated virtual display created for each session instead of a physical monitor.
             The virtual display uses the resolution and refresh rate requested by the client and is removed when the session ends.
             If the Solstice virtual display driver is missing or fails, streaming falls back to the physical display.
-            The virtual display is always made the primary display: a `dd_configuration_option` of `disabled`,
-            `verify_only` or `ensure_active` is treated as `ensure_primary` while it is in use. If the display
+            The virtual display is made the primary display: a `dd_configuration_option` of `disabled`,
+            `verify_only` or `ensure_active` is treated as `ensure_primary` while it is in use, unless
+            [virtual_display_secondary](#virtual_display_secondary) is enabled. If the display
             configuration cannot be applied within a few seconds, the virtual display is removed and streaming falls back
             to the physical display.
             <br>
@@ -1201,6 +1202,37 @@ consent prompt for directory ACLs, so the Web UI shows setup steps for correctin
         <td></td>
         <td>always</td>
         <td>Use a virtual display for every app, except those that disable it.</td>
+    </tr>
+</table>
+
+### virtual_display_secondary
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Add the [virtual display](#virtual_display) as a secondary display instead of making it the primary one.
+            The desktop is extended to the virtual display (as with `ensure_active`), whatever
+            `dd_configuration_option` is set to: the physical displays stay on and the current primary display stays
+            primary.
+            <br>
+            <br>
+            Windows opens new windows on the primary display, so an app may start on the physical display instead of
+            the streamed one. Move it to the virtual display, or configure the app to use that display.
+            @note{Applies to Windows only.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            disabled
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            virtual_display_secondary = enabled
+            @endcode</td>
     </tr>
 </table>
 

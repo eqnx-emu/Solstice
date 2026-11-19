@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import Checkbox from '../../../Checkbox.vue'
 
 const props = defineProps({
   platform: String,
@@ -18,5 +19,12 @@ const config = ref(props.config)
       <option value="always">{{ $t('config.virtual_display_always') }}</option>
     </select>
     <div class="form-text">{{ $t('config.virtual_display_desc') }}</div>
+  </div>
+  <div class="mb-3" v-if="platform === 'windows' && config.virtual_display !== 'disabled'">
+    <Checkbox id="virtual_display_secondary"
+      locale-prefix="config"
+      v-model="config.virtual_display_secondary"
+      default="false"
+    ></Checkbox>
   </div>
 </template>
